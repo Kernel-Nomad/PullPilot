@@ -66,7 +66,7 @@ PullPilot expects your projects to be organized in subfolders within a root fold
 
 ```
 
-> :warning: **Warning:** To prevent PullPilot from detecting itself as a project to update (causing conflicts), it is recommended to install it in a separate folder from where you keep your other Docker projects.
+> :warning: Auto-exclusion Logic: Even if placed inside the root folder, the application is hardcoded to automatically ignore folders named: pullpilot, pullpilot-ui, docker-updater, and data.
 
 #### Suggested structure:
 
@@ -85,7 +85,6 @@ PullPilot expects your projects to be organized in subfolders within a root fold
 └── docker-compose.yml
 
 ```
-Note: By keeping the `pullpilot` folder outside of `my_projects`, the application acts as an external orchestrator and will not erroneously try to update itself during the global scan.
 
 ### 2. Prepare the environment
 
@@ -215,7 +214,7 @@ PullPilot espera que tus proyectos estén organizados en subcarpetas dentro de u
 
 ```
 
-> :warning: **Aviso:** Para evitar que PullPilot se detecte a sí mismo como un proyecto a actualizar (causando conflictos), se recomienda instalarlo en una carpeta separada de donde guardas tus otros proyectos Docker.
+> :warning: Lógica de auto-exclusión: Incluso si se colocan dentro de la carpeta raíz, la aplicación está programada para ignorar automáticamente las carpetas con los nombres: pullpilot, pullpilot-ui, docker-updater y data.
 
 #### Estructura sugerida:
 
@@ -232,8 +231,6 @@ PullPilot espera que tus proyectos estén organizados en subcarpetas dentro de u
     └── docker-compose.yml
 
 ```
-
-Nota: Al mantener la carpeta pullpilot fuera de mis_proyectos, la aplicación actuará como un orquestador externo y no intentará actualizarse a sí misma erróneamente durante el escaneo global.
 
 ### 2. Prepara el entorno
 
