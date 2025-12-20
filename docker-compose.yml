@@ -1,0 +1,18 @@
+services:
+  pullpilot:
+    container_name: pullpilot
+    image: ghcr.io/kernel-nomad/pullpilot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PULLPILOT_PORT:-8000}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - pullpilot_data:/app/data
+      - ${DOCKER_ROOT_PATH}:/app/projects
+    environment:
+      - TZ=${TZ}
+
+volumes:
+  pullpilot_data:
