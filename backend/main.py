@@ -19,6 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from starlette.middleware.sessions import SessionMiddleware
 
+# --- Configuración Inicial ---
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 PROJECTS_ROOT = os.getenv("PROJECTS_ROOT", "/app/projects")
 DB_PATH = os.path.join(DATA_DIR, "pullpilot.db")
@@ -34,6 +35,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("pullpilot")
 
+# --- Base de Datos ---
 Base = declarative_base()
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -71,6 +73,7 @@ def get_db():
     finally:
         db.close()
 
+# --- Estado Global ---
 global_update_status = {
     "is_running": False,
     "total": 0,
@@ -81,6 +84,40 @@ global_update_status = {
 
 app = FastAPI(title="PullPilot API")
 
+# --- MIDDLEWARES ---
+# IMPORTANTE: El orden aquí es crítico para evitar el error 500.
+# Definimos auth_middleware PRIMERO con el decorador, pero al usar add_middleware después
+# para la sesión, Starlette envolverá auth_middleware con SessionMiddleware.
+# Flujo resultante: Petición -> SessionMiddleware (crea request.session) -> auth_middleware (usa request.session)
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # Si no hay usuario/pass configurados, permitimos todo (modo abierto)
+    if not AUTH_USER or not AUTH_PASS:
+        return await call_next(request)
+
+    path = request.url.path
+
+    # Rutas exentas de autenticación
+    public_paths = ["/login", "/logout"]
+    public_extensions = (".png", ".ico", ".js", ".css", ".svg", ".json")
+
+    if path in public_paths or path.endswith(public_extensions) or path.startswith("/assets/"):
+        return await call_next(request)
+
+    # Verificación de sesión
+    user = request.session.get("user")
+    if not user:
+        # Si es una llamada a la API, retornamos 401 para que el frontend lo maneje
+        if path.startswith("/api"):
+            return JSONResponse(status_code=401, content={"detail": "Sesión expirada"})
+        
+        # Si es navegación normal, redirigimos al login
+        return RedirectResponse(url="/login")
+
+    return await call_next(request)
+
+# Añadimos SessionMiddleware DESPUÉS de definir auth_middleware para que se ejecute ANTES
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
@@ -96,30 +133,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-
-    if not AUTH_USER or not AUTH_PASS:
-        return await call_next(request)
-
-    path = request.url.path
-
-    public_paths = ["/login", "/logout"]
-    public_extensions = (".png", ".ico", ".js", ".css", ".svg", ".json")
-
-    if path in public_paths or path.endswith(public_extensions) or path.startswith("/assets/"):
-        return await call_next(request)
-
-    user = request.session.get("user")
-    if not user:
-
-        if path.startswith("/api"):
-            return JSONResponse(status_code=401, content={"detail": "Sesión expirada"})
-
-        return RedirectResponse(url="/login")
-
-    return await call_next(request)
-
+# --- Modelos Pydantic ---
 class Project(BaseModel):
     name: str
     path: str
@@ -138,6 +152,7 @@ class ScheduleInput(BaseModel):
     minute: int = 0
     date_iso: Optional[str] = None
 
+# --- Funciones Auxiliares ---
 def get_docker_compose_cmd():
     try:
         subprocess.run(["docker", "compose", "version"],
@@ -168,6 +183,7 @@ def run_command(cmd, cwd=None):
         logger.error(error_msg)
         raise Exception(error_msg)
 
+# --- Lógica de Negocio ---
 def scan_projects_logic(db: Session):
     found = []
     if not os.path.exists(PROJECTS_ROOT):
@@ -331,6 +347,7 @@ def job_wrapper(target: str):
         finally:
             db.close()
 
+# --- Scheduler ---
 scheduler = BackgroundScheduler()
 
 def refresh_scheduler_jobs():
@@ -370,12 +387,15 @@ def refresh_scheduler_jobs():
 scheduler.start()
 refresh_scheduler_jobs()
 
+# --- Rutas ---
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if request.session.get("user"):
         return RedirectResponse(url="/")
 
     try:
+        # Nota: Asegúrate de que login.html se copia al mismo dir que main.py en el Dockerfile
         with open("login.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
@@ -484,6 +504,7 @@ def delete_schedule(id: int, db: Session = Depends(get_db)):
         refresh_scheduler_jobs()
     return {"status": "ok"}
 
+# Servir estáticos al final para que no interfieran con las rutas API
 if os.path.exists(STATIC_DIR):
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
