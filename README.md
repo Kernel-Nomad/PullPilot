@@ -98,6 +98,7 @@ AUTH_USER=admin
 AUTH_PASS=your_secure_password
 
 # PULLPILOT_PORT=8000
+SESSION_SECRET=  # 2gcs1br2kf8dasjk8
 
 ```
 
@@ -245,6 +246,7 @@ AUTH_USER=admin
 AUTH_PASS=tu_password_segura
 
 # PULLPILOT_PORT=8000
+SESSION_SECRET=  # 2gcs1br2kf8dasjk8
 
 ```
 
