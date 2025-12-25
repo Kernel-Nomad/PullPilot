@@ -45,7 +45,10 @@ const App = () => {
 
   const handleAuthError = (res) => {
     if (res.status === 401) {
-        window.location.href = '/login';
+        stopPolling();
+        if (window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
         throw new Error('Sesión expirada');
     }
     return res;

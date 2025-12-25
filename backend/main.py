@@ -101,12 +101,15 @@ async def auth_middleware(request: Request, call_next):
         
         return RedirectResponse(url="/login")
 
+    request.session["user"] = user
+    request.session["last_seen"] = int(datetime.datetime.utcnow().timestamp())
+
     return await call_next(request)
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
-    max_age=86400,
+    max_age=2592000,
     session_cookie="pullpilot_session",
     https_only=False
 )
