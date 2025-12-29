@@ -253,9 +253,9 @@ const App = () => {
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="PullPilot Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain" />
           
-          <div className="hidden md:block">
+          <div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">{t('app.title')}</h1>
-            <p className="text-xs text-slate-500 font-medium">{t('app.subtitle')}</p>
+            <p className="text-xs text-slate-500 font-medium hidden md:block">{t('app.subtitle')}</p>
           </div>
         </div>
         
