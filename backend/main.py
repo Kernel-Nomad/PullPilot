@@ -221,7 +221,10 @@ def scan_projects_logic(db: Session):
 
 def update_single_project_logic(name: str, db: Session):
     """
-    Lógica de actualización mejorada con logs detallados y control de errores granular.
+    Lógica de actualización mejorada:
+    1. Prune menos agresivo (en global).
+    2. Stop intermedio entre Pull y Up.
+    3. Healthcheck post-update.
     """
     project = db.query(ProjectSettings).filter(ProjectSettings.name == name).first()
     if not project:
@@ -230,7 +233,6 @@ def update_single_project_logic(name: str, db: Session):
     logs = []
     
     def log(msg, level="INFO"):
-        # Formato de timestamp para el log visual del usuario
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         prefix = "✅" if level == "SUCCESS" else "❌" if level == "ERROR" else "ℹ️"
         logs.append(f"[{ts}] {prefix} {msg}")
@@ -262,18 +264,46 @@ def update_single_project_logic(name: str, db: Session):
         duration = round(time.time() - start_t, 2)
         log(f"Imágenes descargadas correctamente ({duration}s).", "SUCCESS")
 
-        # 3. FULL STOP (Si está activado)
+        # --- MEJORA 2: STOP ENTRE PULL Y UP ---
+        # Si 'full_stop' es True, el 'down' posterior ya se encarga de parar y borrar.
+        # Si es False, hacemos un 'stop' explícito para asegurar parada limpia antes de recrear.
         if project.full_stop:
-            log("Modo Full Stop activado. Deteniendo contenedores...")
-            down_out = run_command(f"{COMPOSE_CMD} down", cwd=project.path)
-            log("Contenedores detenidos y eliminados.", "SUCCESS")
+            log("Modo Full Stop activado. Ejecutando 'down' completo...")
+            run_command(f"{COMPOSE_CMD} down", cwd=project.path)
+            log("Contenedores eliminados (Down).", "SUCCESS")
+        else:
+            log("Deteniendo contenedores para actualización segura (Stop)...")
+            run_command(f"{COMPOSE_CMD} stop", cwd=project.path)
+            log("Contenedores detenidos.", "SUCCESS")
 
-        # 4. DOCKER COMPOSE UP
+        # 3. DOCKER COMPOSE UP
         log("Recreando contenedores (Up -d --build)...")
         start_t = time.time()
-        up_out = run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
+        run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
         duration = round(time.time() - start_t, 2)
         log(f"Despliegue finalizado exitosamente ({duration}s).", "SUCCESS")
+
+        # --- MEJORA 3: VERIFICACIÓN DE SALUD (HEALTHCHECK) ---
+        log("Verificando salud de la aplicación (Esperando 10s)...")
+        time.sleep(10) # Damos tiempo a que el contenedor falle si va a fallar
+
+        # Verificamos cuántos contenedores están realmente 'running'
+        # Usamos filter status=running para contar solo los sanos
+        running_out = run_command(f"{COMPOSE_CMD} ps -q --filter status=running", cwd=project.path)
+        running_count = len(running_out.splitlines()) if running_out else 0
+
+        # Verificamos si hay alguno reiniciándose (bucle de error)
+        restarting_out = run_command(f"{COMPOSE_CMD} ps -q --filter status=restarting", cwd=project.path)
+        restarting_count = len(restarting_out.splitlines()) if restarting_out else 0
+
+        if restarting_count > 0:
+            raise Exception(f"Healthcheck fallido: Se detectaron {restarting_count} contenedores en bucle de reinicio.")
+        
+        if running_count == 0:
+            # Caso extremo: el comando up funcionó pero no hay nada corriendo (ej. exit code 0 inmediato)
+            raise Exception("Healthcheck fallido: No se detectaron contenedores activos tras el despliegue.")
+
+        log(f"Healthcheck OK: {running_count} contenedores activos y estables.", "SUCCESS")
         
         logs.append("=== PROCESO COMPLETADO CORRECTAMENTE ===")
         return True, logs
@@ -285,7 +315,7 @@ def update_single_project_logic(name: str, db: Session):
 
 def global_update_job():
     """
-    Tarea global con 'Modo Paranoico' y limpieza segura.
+    Tarea global con limpieza segura (Prune conservador).
     """
     global global_update_status
 
@@ -338,15 +368,15 @@ def global_update_job():
         global_update_status["current_project"] = "Limpiando sistema (Safe Prune)..."
         try:
             # 1. Espera de seguridad (deja asentar los contenedores recién creados)
-            logger.info("Iniciando espera de seguridad de 10s antes del prune...")
-            time.sleep(10)
+            logger.info("Iniciando espera de seguridad de 5s antes del prune...")
+            time.sleep(5)
             
-            # 2. Ejecutar limpieza segura (Solo imágenes, NO system prune)
-            # -a: Borra todas las imágenes sin usar (no solo dangling)
-            # -f: Force (sin confirmación)
-            prune_out = run_command("docker image prune -af")
+            # --- MEJORA 1: LIMPIEZA CONSERVADORA ---
+            # Antes: "docker image prune -af" (Borraba todo lo no usado, incluyendo versiones anteriores tageadas)
+            # Ahora: "docker image prune -f" (Borra solo imágenes <none> / dangling)
+            prune_out = run_command("docker image prune -f")
             
-            msg = "Limpieza de imágenes obsoletas completada. (Contenedores respetados)"
+            msg = "Limpieza de imágenes obsoletas completada (Safe Mode)."
             if prune_out:
                 msg += f"\nOutput Docker:\n{prune_out}"
             global_logs["safe_cleanup"] = msg
