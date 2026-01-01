@@ -119,10 +119,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
-      - ${DOCKER_ROOT_PATH}:/app/projects
+      - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
       - ./sessions:/app/sessions
     environment:
       - TZ=${TZ}
+      - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
 
 volumes:
   pullpilot_data:
@@ -267,10 +268,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
-      - ${DOCKER_ROOT_PATH}:/app/projects
+      - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
       - ./sessions:/app/sessions
     environment:
       - TZ=${TZ}
+      - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
 
 volumes:
   pullpilot_data:
