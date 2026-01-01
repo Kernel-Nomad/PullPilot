@@ -27,6 +27,9 @@ PROJECTS_ROOT = os.getenv("PROJECTS_ROOT", "/app/projects")
 DB_PATH = os.path.join(DATA_DIR, "pullpilot.db")
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
+# NUEVA VARIABLE DE CONFIGURACIÓN
+HEALTHCHECK_TIMEOUT = int(os.getenv("HEALTHCHECK_TIMEOUT", "60")) # Tiempo máx en segundos para esperar salud
+
 AUTH_USER = os.getenv("AUTH_USER")
 AUTH_PASS = os.getenv("AUTH_PASS")
 SESSION_SECRET = os.getenv("SESSION_SECRET", secrets.token_hex(32))
@@ -221,10 +224,7 @@ def scan_projects_logic(db: Session):
 
 def update_single_project_logic(name: str, db: Session):
     """
-    Lógica de actualización mejorada:
-    1. Prune menos agresivo (en global).
-    2. Stop intermedio entre Pull y Up.
-    3. Healthcheck post-update.
+    Lógica de actualización mejorada con Rollback Automático y Smart Healthchecks.
     """
     project = db.query(ProjectSettings).filter(ProjectSettings.name == name).first()
     if not project:
@@ -234,83 +234,129 @@ def update_single_project_logic(name: str, db: Session):
     
     def log(msg, level="INFO"):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
-        prefix = "✅" if level == "SUCCESS" else "❌" if level == "ERROR" else "ℹ️"
+        prefix = "✅" if level == "SUCCESS" else "❌" if level == "ERROR" else "⚠️" if level == "WARN" else "ℹ️"
         logs.append(f"[{ts}] {prefix} {msg}")
 
-    log(f"=== INICIANDO ACTUALIZACIÓN: {name} ===")
-    log(f"Ruta: {project.path}")
-    log(f"Estrategia: {'Full Stop (Recreación total)' if project.full_stop else 'Rolling Update (Estándar)'}")
+    log(f"=== ACTUALIZANDO: {name} ===")
+    
+    # 1. CAPTURA DE ESTADO PREVIO (SNAPSHOT)
+    git_hash_before = None
+    is_git_repo = os.path.isdir(os.path.join(project.path, ".git"))
+
+    if is_git_repo:
+        try:
+            git_hash_before = run_command("git rev-parse HEAD", cwd=project.path)
+            log(f"Snapshot creado. Commit actual: {git_hash_before[:7]}")
+        except Exception as e:
+            log(f"No se pudo guardar estado Git: {e}", "WARN")
 
     try:
-        # 1. GIT PULL
-        if os.path.isdir(os.path.join(project.path, ".git")):
-            log("Detectado repositorio Git. Ejecutando 'git pull'...")
-            try:
-                start_t = time.time()
-                git_out = run_command("git pull", cwd=project.path)
-                duration = round(time.time() - start_t, 2)
-                log(f"Git Pull completado ({duration}s).", "SUCCESS")
-                if git_out: logs.append(f"   > Output: {git_out}")
-            except Exception as e:
-                log(f"Git Pull falló: {str(e)}", "ERROR")
-                logs.append("   > Continuando con la actualización de imágenes pese al error de Git...")
-        else:
-             log("No es un repositorio Git. Saltando actualización de código.")
+        # 2. PROCESO DE ACTUALIZACIÓN
+        
+        # Git Pull
+        if is_git_repo:
+            log("Ejecutando git pull...")
+            run_command("git pull", cwd=project.path)
+        
+        # Docker Pull
+        log("Descargando imágenes nuevas...")
+        run_command(f"{COMPOSE_CMD} pull", cwd=project.path)
 
-        # 2. DOCKER COMPOSE PULL
-        log(f"Descargando imágenes ({COMPOSE_CMD} pull)...")
-        start_t = time.time()
-        pull_out = run_command(f"{COMPOSE_CMD} pull", cwd=project.path)
-        duration = round(time.time() - start_t, 2)
-        log(f"Imágenes descargadas correctamente ({duration}s).", "SUCCESS")
-
-        # --- MEJORA 2: STOP ENTRE PULL Y UP ---
-        # Si 'full_stop' es True, el 'down' posterior ya se encarga de parar y borrar.
-        # Si es False, hacemos un 'stop' explícito para asegurar parada limpia antes de recrear.
+        # Stop (o Down si es full_stop)
         if project.full_stop:
-            log("Modo Full Stop activado. Ejecutando 'down' completo...")
+            log("Modo Full Stop: Bajando servicios...")
             run_command(f"{COMPOSE_CMD} down", cwd=project.path)
-            log("Contenedores eliminados (Down).", "SUCCESS")
         else:
-            log("Deteniendo contenedores para actualización segura (Stop)...")
+            log("Deteniendo contenedores...")
             run_command(f"{COMPOSE_CMD} stop", cwd=project.path)
-            log("Contenedores detenidos.", "SUCCESS")
 
-        # 3. DOCKER COMPOSE UP
-        log("Recreando contenedores (Up -d --build)...")
-        start_t = time.time()
+        # Up
+        log("Recreando contenedores...")
         run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
-        duration = round(time.time() - start_t, 2)
-        log(f"Despliegue finalizado exitosamente ({duration}s).", "SUCCESS")
 
-        # --- MEJORA 3: VERIFICACIÓN DE SALUD (HEALTHCHECK) ---
-        log("Verificando salud de la aplicación (Esperando 10s)...")
-        time.sleep(10) # Damos tiempo a que el contenedor falle si va a fallar
-
-        # Verificamos cuántos contenedores están realmente 'running'
-        # Usamos filter status=running para contar solo los sanos
-        running_out = run_command(f"{COMPOSE_CMD} ps -q --filter status=running", cwd=project.path)
-        running_count = len(running_out.splitlines()) if running_out else 0
-
-        # Verificamos si hay alguno reiniciándose (bucle de error)
-        restarting_out = run_command(f"{COMPOSE_CMD} ps -q --filter status=restarting", cwd=project.path)
-        restarting_count = len(restarting_out.splitlines()) if restarting_out else 0
-
-        if restarting_count > 0:
-            raise Exception(f"Healthcheck fallido: Se detectaron {restarting_count} contenedores en bucle de reinicio.")
+        # 3. SMART HEALTHCHECK (POLLING)
+        log(f"Verificando salud (Timeout: {HEALTHCHECK_TIMEOUT}s)...")
+        start_time = time.time()
         
-        if running_count == 0:
-            # Caso extremo: el comando up funcionó pero no hay nada corriendo (ej. exit code 0 inmediato)
-            raise Exception("Healthcheck fallido: No se detectaron contenedores activos tras el despliegue.")
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > HEALTHCHECK_TIMEOUT:
+                raise Exception(f"Timeout: Los servicios no iniciaron correctamente en {HEALTHCHECK_TIMEOUT}s.")
 
-        log(f"Healthcheck OK: {running_count} contenedores activos y estables.", "SUCCESS")
-        
+            # Obtener IDs de los contenedores del proyecto
+            try:
+                ids_out = run_command(f"{COMPOSE_CMD} ps -q", cwd=project.path)
+                container_ids = ids_out.split()
+            except:
+                container_ids = []
+
+            if not container_ids:
+                if elapsed > 5: # Dar margen de 5s para que aparezcan
+                    raise Exception("No se detectaron contenedores activos tras el despliegue.")
+                time.sleep(1)
+                continue
+
+            # Inspeccionar estado real de cada contenedor
+            all_healthy = True
+            
+            for cid in container_ids:
+                # Obtenemos JSON crudo para máxima precisión
+                inspect_raw = run_command(f"docker inspect {cid}")
+                data = json.loads(inspect_raw)[0]
+                state = data.get("State", {})
+                
+                status = state.get("Status") # running, restarting, exited, dead
+                health = state.get("Health", {}).get("Status") # healthy, unhealthy, starting, None
+
+                # Fallo inmediato si reinicia o muere
+                if status == "restarting":
+                    raise Exception(f"Contenedor {cid[:12]} detectado en bucle de reinicio.")
+                if status in ["exited", "dead"]:
+                    exit_code = state.get("ExitCode")
+                    if exit_code != 0:
+                         raise Exception(f"Contenedor {cid[:12]} finalizó con error (Code: {exit_code}).")
+
+                # Chequeo de Salud Nativo
+                if health == "unhealthy":
+                    raise Exception(f"Healthcheck fallido para {cid[:12]} (Estado: unhealthy).")
+                
+                # Si está 'starting', aún no está listo
+                if health == "starting":
+                    all_healthy = False
+                
+                # Si no tiene healthcheck, confiamos en que esté 'running' (status ya verificado arriba)
+
+            if all_healthy:
+                log("Healthcheck superado: Todos los servicios estables.", "SUCCESS")
+                break
+            
+            time.sleep(2) # Esperar 2 segundos antes del siguiente chequeo
+
         logs.append("=== PROCESO COMPLETADO CORRECTAMENTE ===")
         return True, logs
 
     except Exception as e:
-        log(f"ERROR CRÍTICO: {str(e)}", "ERROR")
-        logs.append(f"Detalle técnico:\n{traceback.format_exc()}")
+        log(f"FALLO CRÍTICO DETECTADO: {str(e)}", "ERROR")
+        
+        # 4. SISTEMA DE ROLLBACK AUTOMÁTICO
+        if git_hash_before:
+            log("⏳ INICIANDO ROLLBACK AUTOMÁTICO...", "WARN")
+            try:
+                # Revertir código
+                run_command(f"git reset --hard {git_hash_before}", cwd=project.path)
+                log(f"Código revertido a commit {git_hash_before[:7]}.")
+                
+                # Revertir despliegue
+                log("Forzando redespliegue de versión anterior...")
+                run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
+                
+                log(f"✅ Rollback exitoso. El sistema ha vuelto al estado previo.", "SUCCESS")
+                logs.append("NOTA: Se ha realizado un rollback automático para restaurar el servicio.")
+            except Exception as rb_error:
+                log(f"❌ FATAL: El Rollback también falló: {str(rb_error)}", "ERROR")
+        else:
+            log("⚠️ No es posible hacer Rollback (no es un repo Git o no se guardó el estado).", "WARN")
+
         return False, logs
 
 def global_update_job():
