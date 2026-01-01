@@ -4,7 +4,9 @@ import json
 import logging
 import sqlite3
 import datetime
+import time
 import secrets
+import traceback
 from typing import List, Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends, Request, Form, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from starlette.middleware.sessions import SessionMiddleware
 
+# --- CONFIGURACIÓN ---
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 PROJECTS_ROOT = os.getenv("PROJECTS_ROOT", "/app/projects")
 DB_PATH = os.path.join(DATA_DIR, "pullpilot.db")
@@ -31,9 +34,11 @@ SESSION_SECRET = os.getenv("SESSION_SECRET", secrets.token_hex(32))
 os.environ.setdefault("TZ", "UTC")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Logging del sistema (consola)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("pullpilot")
 
+# --- BASE DE DATOS ---
 Base = declarative_base()
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -71,6 +76,7 @@ def get_db():
     finally:
         db.close()
 
+# --- ESTADO GLOBAL ---
 global_update_status = {
     "is_running": False,
     "total": 0,
@@ -79,6 +85,7 @@ global_update_status = {
     "processed": []
 }
 
+# --- APP FASTAPI ---
 app = FastAPI(title="PullPilot API")
 
 @app.middleware("http")
@@ -87,7 +94,6 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     path = request.url.path
-
     public_paths = ["/login", "/logout"]
     public_extensions = (".png", ".ico", ".js", ".css", ".svg", ".json", ".webmanifest")
 
@@ -98,12 +104,10 @@ async def auth_middleware(request: Request, call_next):
     if not user:
         if path.startswith("/api"):
             return JSONResponse(status_code=401, content={"detail": "Sesión expirada"})
-        
         return RedirectResponse(url="/login")
 
     request.session["user"] = user
     request.session["last_seen"] = int(datetime.datetime.utcnow().timestamp())
-
     return await call_next(request)
 
 app.add_middleware(
@@ -121,6 +125,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- MODELOS PYDANTIC ---
 class Project(BaseModel):
     name: str
     path: str
@@ -139,6 +144,7 @@ class ScheduleInput(BaseModel):
     minute: int = 0
     date_iso: Optional[str] = None
 
+# --- HERRAMIENTAS DOCKER ---
 def get_docker_compose_cmd():
     try:
         subprocess.run(["docker", "compose", "version"],
@@ -153,7 +159,7 @@ COMPOSE_CMD = get_docker_compose_cmd()
 
 def run_command(cmd, cwd=None):
     try:
-        logger.info(f"Ejecutando: {cmd} en {cwd}")
+        logger.info(f"Exec: {cmd} en {cwd}")
         result = subprocess.run(
             cmd,
             cwd=cwd,
@@ -168,6 +174,8 @@ def run_command(cmd, cwd=None):
         error_msg = f"Error command: {cmd}\nStderr: {e.stderr}"
         logger.error(error_msg)
         raise Exception(error_msg)
+
+# --- LÓGICA DE NEGOCIO ---
 
 def scan_projects_logic(db: Session):
     found = []
@@ -212,45 +220,73 @@ def scan_projects_logic(db: Session):
     return found
 
 def update_single_project_logic(name: str, db: Session):
+    """
+    Lógica de actualización mejorada con logs detallados y control de errores granular.
+    """
     project = db.query(ProjectSettings).filter(ProjectSettings.name == name).first()
     if not project:
-        return False, ["Proyecto no encontrado en base de datos."]
+        return False, ["ERROR: Proyecto no encontrado en la base de datos."]
 
     logs = []
-    logs.append(f"=== Iniciando actualización de {name} ===")
+    
+    def log(msg, level="INFO"):
+        # Formato de timestamp para el log visual del usuario
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        prefix = "✅" if level == "SUCCESS" else "❌" if level == "ERROR" else "ℹ️"
+        logs.append(f"[{ts}] {prefix} {msg}")
+
+    log(f"=== INICIANDO ACTUALIZACIÓN: {name} ===")
+    log(f"Ruta: {project.path}")
+    log(f"Estrategia: {'Full Stop (Recreación total)' if project.full_stop else 'Rolling Update (Estándar)'}")
 
     try:
+        # 1. GIT PULL
         if os.path.isdir(os.path.join(project.path, ".git")):
-            logs.append(f"> git pull en {project.path}")
+            log("Detectado repositorio Git. Ejecutando 'git pull'...")
             try:
+                start_t = time.time()
                 git_out = run_command("git pull", cwd=project.path)
-                logs.append(git_out if git_out else "Git: Already up to date.")
+                duration = round(time.time() - start_t, 2)
+                log(f"Git Pull completado ({duration}s).", "SUCCESS")
+                if git_out: logs.append(f"   > Output: {git_out}")
             except Exception as e:
-                logs.append(f"Error en Git Pull (se continuará): {str(e)}")
+                log(f"Git Pull falló: {str(e)}", "ERROR")
+                logs.append("   > Continuando con la actualización de imágenes pese al error de Git...")
         else:
-             logs.append(f"> Omitiendo git pull (no es un repo git): {project.path}")
+             log("No es un repositorio Git. Saltando actualización de código.")
 
-        logs.append(f"> {COMPOSE_CMD} pull")
+        # 2. DOCKER COMPOSE PULL
+        log(f"Descargando imágenes ({COMPOSE_CMD} pull)...")
+        start_t = time.time()
         pull_out = run_command(f"{COMPOSE_CMD} pull", cwd=project.path)
-        logs.append(pull_out)
+        duration = round(time.time() - start_t, 2)
+        log(f"Imágenes descargadas correctamente ({duration}s).", "SUCCESS")
 
+        # 3. FULL STOP (Si está activado)
         if project.full_stop:
-            logs.append(f"> {COMPOSE_CMD} down (Modo Full Stop activado)")
+            log("Modo Full Stop activado. Deteniendo contenedores...")
             down_out = run_command(f"{COMPOSE_CMD} down", cwd=project.path)
-            logs.append(down_out)
+            log("Contenedores detenidos y eliminados.", "SUCCESS")
 
-        logs.append(f"> {COMPOSE_CMD} up -d --build --remove-orphans")
+        # 4. DOCKER COMPOSE UP
+        log("Recreando contenedores (Up -d --build)...")
+        start_t = time.time()
         up_out = run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
-        logs.append(up_out)
-
-        logs.append("=== Actualización completada con éxito ===")
+        duration = round(time.time() - start_t, 2)
+        log(f"Despliegue finalizado exitosamente ({duration}s).", "SUCCESS")
+        
+        logs.append("=== PROCESO COMPLETADO CORRECTAMENTE ===")
         return True, logs
 
     except Exception as e:
-        logs.append(f"!!! ERROR CRITICO !!!: {str(e)}")
+        log(f"ERROR CRÍTICO: {str(e)}", "ERROR")
+        logs.append(f"Detalle técnico:\n{traceback.format_exc()}")
         return False, logs
 
 def global_update_job():
+    """
+    Tarea global con 'Modo Paranoico' y limpieza segura.
+    """
     global global_update_status
 
     if global_update_status["is_running"]:
@@ -261,7 +297,7 @@ def global_update_job():
     global_update_status["processed"] = []
 
     db = SessionLocal()
-    logger.info("Iniciando tarea programada: Actualización Global")
+    logger.info("Iniciando tarea programada: Actualización Global Segura")
 
     projects = db.query(ProjectSettings).filter(ProjectSettings.excluded == False).all()
 
@@ -276,7 +312,16 @@ def global_update_job():
         global_update_status["current"] = i + 1
         global_update_status["current_project"] = proj.name
 
-        success, logs = update_single_project_logic(proj.name, db)
+        # Delay de cortesía entre proyectos para estabilidad
+        if i > 0:
+            time.sleep(2)
+
+        try:
+            success, logs = update_single_project_logic(proj.name, db)
+        except Exception as e:
+            success = False
+            logs = [f"❌ Error interno en el bucle principal: {str(e)}"]
+
         global_logs[proj.name] = logs
 
         global_update_status["processed"].append({
@@ -287,12 +332,33 @@ def global_update_job():
         if success: success_count += 1
         else: error_count += 1
 
-    global_update_status["current_project"] = "Limpiando sistema (Prune)..."
-    try:
-        run_command("docker system prune -f")
-        global_logs["system_prune"] = "Limpieza ejecutada"
-    except:
-        global_logs["system_prune"] = "Error en limpieza"
+    # --- FASE DE LIMPIEZA (MODO PARANOICO) ---
+    
+    if error_count == 0:
+        global_update_status["current_project"] = "Limpiando sistema (Safe Prune)..."
+        try:
+            # 1. Espera de seguridad (deja asentar los contenedores recién creados)
+            logger.info("Iniciando espera de seguridad de 10s antes del prune...")
+            time.sleep(10)
+            
+            # 2. Ejecutar limpieza segura (Solo imágenes, NO system prune)
+            # -a: Borra todas las imágenes sin usar (no solo dangling)
+            # -f: Force (sin confirmación)
+            prune_out = run_command("docker image prune -af")
+            
+            msg = "Limpieza de imágenes obsoletas completada. (Contenedores respetados)"
+            if prune_out:
+                msg += f"\nOutput Docker:\n{prune_out}"
+            global_logs["safe_cleanup"] = msg
+            
+        except Exception as e:
+            global_logs["safe_cleanup"] = f"Error en limpieza de imágenes: {str(e)}"
+    else:
+        # Si hubo errores, NO tocamos nada por seguridad
+        warn_msg = f"⚠️ LIMPIEZA OMITIDA: Se detectaron {error_count} errores durante la actualización. " \
+                   "El sistema no ejecutará 'prune' para facilitar la depuración."
+        logger.warning(warn_msg)
+        global_logs["safe_cleanup"] = warn_msg
 
     summary = f"Global Update: {success_count} OK, {error_count} Errores"
     status = "SUCCESS" if error_count == 0 else "ERROR"
@@ -332,6 +398,7 @@ def job_wrapper(target: str):
         finally:
             db.close()
 
+# --- SCHEDULER ---
 scheduler = BackgroundScheduler()
 
 def refresh_scheduler_jobs():
@@ -371,16 +438,22 @@ def refresh_scheduler_jobs():
 scheduler.start()
 refresh_scheduler_jobs()
 
+# --- RUTAS DE LOGIN ---
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if request.session.get("user"):
         return RedirectResponse(url="/")
 
     try:
-        with open("login.html", "r", encoding="utf-8") as f:
+        with open("backend/login.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return HTMLResponse("<h1>Error: login.html not found</h1>", status_code=500)
+        # Fallback por si se ejecuta desde root
+        try:
+            with open("login.html", "r", encoding="utf-8") as f:
+                return f.read()
+        except:
+            return HTMLResponse("<h1>Error: login.html not found</h1>", status_code=500)
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
@@ -394,6 +467,7 @@ async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
+# --- API ENDPOINTS ---
 @app.get("/api/projects", response_model=List[Project])
 def get_projects(db: Session = Depends(get_db)):
     return scan_projects_logic(db)
@@ -412,6 +486,7 @@ def update_project(name: str, background_tasks: BackgroundTasks, db: Session = D
     db.commit()
 
     if not success:
+        # Retornamos error HTTP pero incluimos los logs en el detalle
         raise HTTPException(status_code=500, detail="\n".join(logs))
 
     return {"success": success, "logs": logs}
@@ -485,6 +560,7 @@ def delete_schedule(id: int, db: Session = Depends(get_db)):
         refresh_scheduler_jobs()
     return {"status": "ok"}
 
+# --- STATIC FILES & MAIN ---
 if os.path.exists(STATIC_DIR):
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
