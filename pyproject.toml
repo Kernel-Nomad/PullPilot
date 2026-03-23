@@ -13,8 +13,8 @@ dependencies = [
   "pydantic==2.5.3",
   "sqlalchemy==2.0.25",
   "apscheduler==3.10.4",
-  "python-multipart==0.0.6",
-  "requests==2.31.0",
+  "python-multipart==0.0.22",
+  "requests==2.32.4",
   "itsdangerous",
 ]
 
