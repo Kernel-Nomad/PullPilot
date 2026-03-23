@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pullpilot"
+version = "1.0.0"
+description = "PullPilot backend service"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.109.0",
+  "uvicorn==0.27.0",
+  "pydantic==2.5.3",
+  "sqlalchemy==2.0.25",
+  "apscheduler==3.10.4",
+  "python-multipart==0.0.6",
+  "requests==2.31.0",
+  "itsdangerous",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*"]

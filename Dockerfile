@@ -1,12 +1,12 @@
 FROM node:18-alpine AS frontend-builder
 
-WORKDIR /app-frontend
+WORKDIR /app-web
 
-COPY frontend/package*.json ./
+COPY web/package*.json ./
 
 RUN npm install
 
-COPY frontend/ ./
+COPY web/ ./
 RUN npm run build
 
 FROM python:3.11-slim
@@ -32,17 +32,15 @@ RUN ARCH=$(uname -m) && \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml .
+COPY server/ ./server
+RUN pip install --no-cache-dir .
 
-COPY backend/ ./backend
-COPY backend/login.html ./backend/
-
-COPY --from=frontend-builder /app-frontend/dist ./backend/static
+COPY --from=frontend-builder /app-web/dist ./server/static
 
 RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-WORKDIR /app/backend
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+WORKDIR /app/server
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

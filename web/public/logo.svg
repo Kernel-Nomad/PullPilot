@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PullPilot Logo">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g1)" />
+  <path d="M22 18h10c8 0 14 6 14 14s-6 14-14 14h-4v10h-6V18zm10 22c4.4 0 8-3.6 8-8s-3.6-8-8-8h-4v16h4z" fill="#fff" />
+</svg>

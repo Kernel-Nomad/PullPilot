@@ -7,11 +7,11 @@
 .idea
 *.swp
 *.swo
-frontend/node_modules
+web/node_modules
 node_modules
-frontend/dist
-frontend/build
-frontend/coverage
+web/dist
+web/build
+web/coverage
 __pycache__
 *.pyc
 *.pyo
@@ -19,8 +19,8 @@ __pycache__
 venv
 .venv
 env
-backend/venv
-backend/.venv
+server/venv
+server/.venv
 .env
 .env.*
 *.env
@@ -33,5 +33,5 @@ docker-compose.yaml
 *.sqlite
 *.sqlite3
 data/
-backend/data/
+server/data/
 pullpilot.db

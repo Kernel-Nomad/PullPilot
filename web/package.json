@@ -1,5 +1,5 @@
 {
-  "name": "pullpilot-ui",
+  "name": "@pullpilot/web",
   "private": true,
   "version": "1.0.0",
   "type": "module",
