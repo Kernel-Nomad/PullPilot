@@ -1,11 +1,12 @@
 export const API_URL = "/api";
+export const SESSION_EXPIRED_ERROR = "Sesion expirada";
 
 export async function handleAuthError(response, options = {}) {
   if (response.status === 401) {
     if (typeof options.onUnauthorized === "function") {
       options.onUnauthorized();
     }
-    throw new Error("Sesion expirada");
+    throw new Error(SESSION_EXPIRED_ERROR);
   }
   return response;
 }

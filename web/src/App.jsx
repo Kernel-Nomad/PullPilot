@@ -17,6 +17,7 @@ import {
   fetchSchedules,
   fetchUpdateStatus,
   logout,
+  SESSION_EXPIRED_ERROR,
   toggleProjectSetting,
   triggerUpdateAll,
   updateProject,
@@ -66,7 +67,7 @@ export default function App() {
       setProjects(data);
       setIsMockMode(false);
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         console.warn("Backend no detectado. Cargando datos de prueba (mock mode).", error);
         setProjects(MOCK_PROJECTS);
         setIsMockMode(true);
@@ -81,7 +82,7 @@ export default function App() {
         const data = await fetchHistory(requestContext);
         setHistory(data);
       } catch (error) {
-        if (allowMockFallback && error.message !== "Sesion expirada") {
+        if (allowMockFallback && error.message !== SESSION_EXPIRED_ERROR) {
           setHistory(MOCK_HISTORY);
         }
       } finally {
@@ -99,7 +100,7 @@ export default function App() {
       const data = await fetchSchedules(requestContext);
       setSchedules(data);
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         console.error("Error fetching schedules", error);
       }
     }
@@ -118,7 +119,7 @@ export default function App() {
         await loadHistory(false);
       }
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         console.error("Error checking progress", error);
       }
     }
@@ -151,7 +152,7 @@ export default function App() {
         await updateProject(name, requestContext);
         await loadProjects();
       } catch (error) {
-        if (error.message !== "Sesion expirada") {
+        if (error.message !== SESSION_EXPIRED_ERROR) {
           alert(t("alerts.backend_error"));
         }
       }
@@ -180,11 +181,11 @@ export default function App() {
         is_running: true,
         current: 0,
         total: 1,
-        current_project: "Iniciando...",
+        current_project: t("status.starting"),
       });
       startPolling(checkProgress, 1000);
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         alert(t("alerts.backend_error"));
       }
     }
@@ -210,7 +211,7 @@ export default function App() {
       event.target.reset();
       setSelectedFreq("daily");
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         alert(t("alerts.schedule_error"));
       }
     }
@@ -224,7 +225,7 @@ export default function App() {
       await deleteSchedule(id, requestContext);
       await loadSchedules();
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         console.error("Error deleting schedule", error);
       }
     }
@@ -254,7 +255,21 @@ export default function App() {
       await toggleProjectSetting(name, setting, requestContext);
       await loadProjects();
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
+      setProjects((prev) =>
+        prev.map((project) => {
+          if (project.name !== name) {
+            return project;
+          }
+          if (setting === "exclude") {
+            return { ...project, excluded: !project.excluded };
+          }
+          if (setting === "fullstop") {
+            return { ...project, full_stop: !project.full_stop };
+          }
+          return project;
+        })
+      );
+      if (error.message !== SESSION_EXPIRED_ERROR) {
         console.error(t("alerts.config_error"));
       }
     }

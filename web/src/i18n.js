@@ -9,6 +9,7 @@ const resources = {
         title: "PullPilot",
         subtitle: "Docker Homelab Updater",
         demo_mode: "DEMO",
+        change_language: "Cambiar idioma",
       },
       nav: {
         dashboard: "Dashboard",
@@ -25,8 +26,10 @@ const resources = {
         projects_detected: "{{count}} proyectos detectados.",
         active: "{{count}} activos.",
         update_all: "Actualizar Todo",
+        update_project: "Actualizar proyecto",
         updating: "Actualizando...",
         updating_btn: "Actualizando...",
+        starting: "Iniciando...",
       },
       card: {
         containers: "Contenedores",
@@ -45,6 +48,7 @@ const resources = {
         day_month: "Dia del Mes",
         time: "Hora (24h)",
         create_btn: "Crear Tarea",
+        delete_task: "Eliminar tarea",
         active_tasks: "Tareas Activas",
         tasks_count: "{{count}} Tareas",
         no_tasks: "No hay tareas programadas.",
@@ -56,6 +60,7 @@ const resources = {
       },
       history: {
         title: "Historial de Actualizaciones",
+        refresh: "Actualizar historial",
         table_status: "Estado",
         table_date: "Fecha",
         table_summary: "Resumen",
@@ -89,6 +94,9 @@ const resources = {
       footer: {
         tip_me: "Tip me",
       },
+      pwa: {
+        update_available: "Nueva version disponible. Recargar?",
+      },
     },
   },
   en: {
@@ -97,6 +105,7 @@ const resources = {
         title: "PullPilot",
         subtitle: "Docker Homelab Updater",
         demo_mode: "DEMO",
+        change_language: "Change language",
       },
       nav: {
         dashboard: "Dashboard",
@@ -113,8 +122,10 @@ const resources = {
         projects_detected: "{{count}} projects detected.",
         active: "{{count}} active.",
         update_all: "Update All",
+        update_project: "Update project",
         updating: "Updating...",
         updating_btn: "Updating...",
+        starting: "Starting...",
       },
       card: {
         containers: "Containers",
@@ -133,6 +144,7 @@ const resources = {
         day_month: "Day of Month",
         time: "Time (24h)",
         create_btn: "Create Task",
+        delete_task: "Delete task",
         active_tasks: "Active Tasks",
         tasks_count: "{{count}} Tasks",
         no_tasks: "No scheduled tasks.",
@@ -144,6 +156,7 @@ const resources = {
       },
       history: {
         title: "Update History",
+        refresh: "Refresh history",
         table_status: "Status",
         table_date: "Date",
         table_summary: "Summary",
@@ -176,6 +189,9 @@ const resources = {
       },
       footer: {
         tip_me: "Tip me",
+      },
+      pwa: {
+        update_available: "New version available. Reload?",
       },
     },
   },

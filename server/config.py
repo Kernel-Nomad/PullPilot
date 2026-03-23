@@ -12,6 +12,7 @@ STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
 HEALTHCHECK_TIMEOUT = int(os.getenv("HEALTHCHECK_TIMEOUT", "60"))
+COMMAND_TIMEOUT = int(os.getenv("COMMAND_TIMEOUT", "300"))
 
 AUTH_USER = os.getenv("AUTH_USER")
 AUTH_PASS = os.getenv("AUTH_PASS")

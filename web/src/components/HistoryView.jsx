@@ -8,6 +8,8 @@ export default function HistoryView({ t, history, historyLoading, onRefresh, onS
         <button
           onClick={onRefresh}
           disabled={historyLoading}
+          aria-label={t("history.refresh")}
+          title={t("history.refresh")}
           className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
         >
           <RefreshCw size={18} className={historyLoading ? "animate-spin" : ""} />

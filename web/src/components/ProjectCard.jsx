@@ -47,7 +47,8 @@ export default function ProjectCard({
           <button
             onClick={() => onUpdateProject(project.name)}
             disabled={isUpdatingThis || project.excluded || isGlobalUpdate}
-            title={t("status.update_all")}
+            title={t("status.update_project")}
+            aria-label={t("status.update_project")}
             className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={18} className={isUpdatingThis ? "animate-spin" : ""} />

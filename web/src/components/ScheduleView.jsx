@@ -185,6 +185,8 @@ export default function ScheduleView({
                   <td className="p-4 text-right">
                     <button
                       onClick={() => onDeleteSchedule(schedule.id)}
+                      aria-label={t("schedule.delete_task")}
+                      title={t("schedule.delete_task")}
                       className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />

@@ -35,7 +35,8 @@ export default function Header({
           <button
             onClick={onToggleLanguage}
             className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
-            title="Change Language"
+            title={t("app.change_language")}
+            aria-label={t("app.change_language")}
           >
             <Languages size={20} />
             <span className="text-xs font-bold">{i18n.language.toUpperCase()}</span>
@@ -45,6 +46,7 @@ export default function Header({
             onClick={onLogout}
             className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
             title={t("auth.logout")}
+            aria-label={t("auth.logout")}
           >
             <LogOut size={20} />
           </button>

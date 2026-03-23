@@ -9,7 +9,7 @@ dev-web:
 	cd web && npm run dev
 
 build:
-	docker compose build
+	docker build -t pullpilot .
 
 up:
 	docker compose up -d

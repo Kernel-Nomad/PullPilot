@@ -4,11 +4,11 @@ import { registerSW } from "virtual:pwa-register";
 
 import App from "./App.jsx";
 import "./index.css";
-import "./i18n";
+import i18n from "./i18n";
 
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm("Nueva version disponible. Recargar?")) {
+    if (confirm(i18n.t("pwa.update_available"))) {
       updateSW(true);
     }
   },

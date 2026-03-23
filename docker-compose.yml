@@ -11,7 +11,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
       - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
-      - ./sessions:/app/sessions
     environment:
       - TZ=${TZ}
       - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
