@@ -1,9 +1,14 @@
-# PullPilot — https://github.com/Kernel-Nomad/PullPilot#quick-start-without-cloning-the-repository
-# Requiere .env con DOCKER_ROOT_PATH existente en el host (mismo path en el bind mount).
+# PullPilot — construcción local (sin GHCR).
+# Uso: clona el repo, copia .env.example a .env, ajusta variables y ejecuta:
+#   docker compose -f docker-compose-build.yml up -d --build
+# Misma configuración que docker-compose.yml salvo que la imagen se construye aquí.
 services:
   pullpilot:
     container_name: pullpilot
-    image: ghcr.io/kernel-nomad/pullpilot:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pullpilot:local
     restart: unless-stopped
     env_file:
       - .env

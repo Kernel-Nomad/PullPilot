@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from "lucide-react";
+import { FolderOpen, Loader2, RefreshCw } from "lucide-react";
 
 import ProjectCard from "./ProjectCard";
 
@@ -35,20 +35,40 @@ export default function Dashboard({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map((project) => (
-          <ProjectCard
-            key={project.name}
-            project={project}
-            t={t}
-            isUpdatingThis={Boolean(updatingProjects[project.name])}
-            isGlobalUpdate={progress.is_running}
-            currentProject={progress.current_project}
-            onUpdateProject={onUpdateProject}
-            onToggleSetting={onToggleSetting}
-          />
-        ))}
-      </div>
+      {projects.length === 0 ? (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm"
+          role="status"
+        >
+          <div className="flex gap-3">
+            <FolderOpen className="h-8 w-8 shrink-0 text-amber-700" aria-hidden />
+            <div className="min-w-0 space-y-3">
+              <h3 className="font-semibold text-amber-900">{t("status.empty_projects_title")}</h3>
+              <p className="text-sm text-amber-900/90">{t("status.empty_projects_intro")}</p>
+              <ul className="list-disc space-y-2 pl-5 text-sm text-amber-900/85">
+                <li>{t("status.empty_projects_path")}</li>
+                <li>{t("status.empty_projects_compose")}</li>
+                <li>{t("status.empty_projects_volume")}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((project) => (
+            <ProjectCard
+              key={project.name}
+              project={project}
+              t={t}
+              isUpdatingThis={Boolean(updatingProjects[project.name])}
+              isGlobalUpdate={progress.is_running}
+              currentProject={progress.current_project}
+              onUpdateProject={onUpdateProject}
+              onToggleSetting={onToggleSetting}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

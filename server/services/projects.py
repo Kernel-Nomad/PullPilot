@@ -2,6 +2,9 @@ import datetime
 import json
 import os
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -14,13 +17,94 @@ from server.services.docker import COMPOSE_CMD, run_command
 IGNORED_PROJECT_NAMES = {"pullpilot", "pullpilot-ui", "docker-updater", "data"}
 
 
+def _dir_has_compose_file(path: Path) -> bool:
+    return (path / "docker-compose.yml").exists() or (path / "docker-compose.yaml").exists()
+
+
+def _compose_ps_status(path_str: str) -> tuple[str, int]:
+    try:
+        output = run_command(
+            f"{COMPOSE_CMD} ps -q", cwd=path_str, log_exec=False
+        )
+        running_count = len(output.splitlines()) if output else 0
+        status = "running" if running_count > 0 else "stopped"
+    except Exception:
+        status = "error"
+        running_count = 0
+    return status, running_count
+
+
+def _wait_for_compose_healthy(
+    project_path: str,
+    log: Callable[..., None],
+) -> None:
+    start_time = time.time()
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed > HEALTHCHECK_TIMEOUT:
+            raise RuntimeError(
+                f"Timeout: Los servicios no iniciaron correctamente en {HEALTHCHECK_TIMEOUT}s."
+            )
+
+        try:
+            ids_out = run_command(f"{COMPOSE_CMD} ps -q", cwd=project_path)
+            container_ids = ids_out.split()
+        except Exception:
+            container_ids = []
+
+        if not container_ids:
+            if elapsed > 5:
+                raise RuntimeError(
+                    "No se detectaron contenedores activos tras el despliegue."
+                )
+            time.sleep(1)
+            continue
+
+        all_healthy = True
+        for container_id in container_ids:
+            inspect_raw = run_command(["docker", "inspect", container_id])
+            data = json.loads(inspect_raw)[0]
+            state = data.get("State", {})
+            status = state.get("Status")
+            health = state.get("Health", {}).get("Status")
+
+            if status == "restarting":
+                raise RuntimeError(
+                    f"Contenedor {container_id[:12]} detectado en bucle de reinicio."
+                )
+            if status in {"exited", "dead"}:
+                exit_code = state.get("ExitCode")
+                if exit_code != 0:
+                    raise RuntimeError(
+                        f"Contenedor {container_id[:12]} finalizo con error (code: {exit_code})."
+                    )
+
+            if health == "unhealthy":
+                raise RuntimeError(
+                    f"Healthcheck fallido para {container_id[:12]} (unhealthy)."
+                )
+
+            if health == "starting":
+                all_healthy = False
+                continue
+
+            if health is None and status != "running":
+                all_healthy = False
+
+        if all_healthy:
+            log("Healthcheck superado: todos los servicios estables.", "SUCCESS")
+            break
+
+        time.sleep(2)
+
+
 def scan_projects_logic(db: Session) -> list[dict]:
-    found: list[dict] = []
     if not PROJECTS_ROOT.exists():
-        logger.warning("Directorio PROJECTS_ROOT no existe: %s", PROJECTS_ROOT)
         return []
 
     pending_db_write = False
+    ordered: list[tuple[str, Path, ProjectSettings]] = []
+
     for entry in os.listdir(PROJECTS_ROOT):
         if entry.lower() in IGNORED_PROJECT_NAMES:
             continue
@@ -29,10 +113,7 @@ def scan_projects_logic(db: Session) -> list[dict]:
         if not path.is_dir():
             continue
 
-        has_compose = (path / "docker-compose.yml").exists() or (
-            path / "docker-compose.yaml"
-        ).exists()
-        if not has_compose:
+        if not _dir_has_compose_file(path):
             continue
 
         proj = db.query(ProjectSettings).filter(ProjectSettings.name == entry).first()
@@ -44,14 +125,32 @@ def scan_projects_logic(db: Session) -> list[dict]:
             proj.path = str(path)
             pending_db_write = True
 
-        try:
-            output = run_command(f"{COMPOSE_CMD} ps -q", cwd=str(path))
-            running_count = len(output.splitlines()) if output else 0
-            status = "running" if running_count > 0 else "stopped"
-        except Exception:
-            status = "error"
-            running_count = 0
+        ordered.append((entry, path, proj))
 
+    if pending_db_write:
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            logger.warning(
+                "No se pudo persistir cambios del escaneo de proyectos (altas o rutas)."
+            )
+
+    status_by_entry: dict[str, tuple[str, int]] = {}
+    if ordered:
+        max_workers = min(8, len(ordered))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_entry = {
+                pool.submit(_compose_ps_status, str(path)): entry
+                for entry, path, _ in ordered
+            }
+            for fut in as_completed(future_to_entry):
+                entry = future_to_entry[fut]
+                status_by_entry[entry] = fut.result()
+
+    found: list[dict] = []
+    for entry, path, proj in ordered:
+        status, running_count = status_by_entry[entry]
         found.append(
             {
                 "name": entry,
@@ -62,15 +161,6 @@ def scan_projects_logic(db: Session) -> list[dict]:
                 "full_stop": proj.full_stop,
             }
         )
-
-    if pending_db_write:
-        try:
-            db.commit()
-        except SQLAlchemyError:
-            db.rollback()
-            logger.warning(
-                "No se pudo persistir cambios del escaneo de proyectos (altas o rutas)."
-            )
 
     return found
 
@@ -118,66 +208,7 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
         run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
 
         log(f"Verificando salud (timeout: {HEALTHCHECK_TIMEOUT}s)...")
-        start_time = time.time()
-
-        while True:
-            elapsed = time.time() - start_time
-            if elapsed > HEALTHCHECK_TIMEOUT:
-                raise RuntimeError(
-                    f"Timeout: Los servicios no iniciaron correctamente en {HEALTHCHECK_TIMEOUT}s."
-                )
-
-            try:
-                ids_out = run_command(f"{COMPOSE_CMD} ps -q", cwd=project.path)
-                container_ids = ids_out.split()
-            except Exception:
-                container_ids = []
-
-            if not container_ids:
-                if elapsed > 5:
-                    raise RuntimeError(
-                        "No se detectaron contenedores activos tras el despliegue."
-                    )
-                time.sleep(1)
-                continue
-
-            all_healthy = True
-            for container_id in container_ids:
-                inspect_raw = run_command(["docker", "inspect", container_id])
-                data = json.loads(inspect_raw)[0]
-                state = data.get("State", {})
-                status = state.get("Status")
-                health = state.get("Health", {}).get("Status")
-
-                if status == "restarting":
-                    raise RuntimeError(
-                        f"Contenedor {container_id[:12]} detectado en bucle de reinicio."
-                    )
-                if status in {"exited", "dead"}:
-                    exit_code = state.get("ExitCode")
-                    if exit_code != 0:
-                        raise RuntimeError(
-                            f"Contenedor {container_id[:12]} finalizo con error (code: {exit_code})."
-                        )
-
-                if health == "unhealthy":
-                    raise RuntimeError(
-                        f"Healthcheck fallido para {container_id[:12]} (unhealthy)."
-                    )
-
-                if health == "starting":
-                    all_healthy = False
-                    continue
-
-                # Si no hay HEALTHCHECK, exigimos al menos estado running.
-                if health is None and status != "running":
-                    all_healthy = False
-
-            if all_healthy:
-                log("Healthcheck superado: todos los servicios estables.", "SUCCESS")
-                break
-
-            time.sleep(2)
+        _wait_for_compose_healthy(project.path, log)
 
         logs.append("=== PROCESO COMPLETADO CORRECTAMENTE ===")
         return True, logs

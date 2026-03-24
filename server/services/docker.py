@@ -18,10 +18,16 @@ def get_docker_compose_cmd() -> str:
         return "docker-compose"
 
 
+# Resuelto una vez al importar el módulo (proceso uvicorn / tests).
 COMPOSE_CMD = get_docker_compose_cmd()
 
 
-def run_command(cmd: str | Sequence[str], cwd: str | None = None) -> str:
+def run_command(
+    cmd: str | Sequence[str],
+    cwd: str | None = None,
+    *,
+    log_exec: bool = True,
+) -> str:
     if isinstance(cmd, str):
         cmd_args = shlex.split(cmd)
         cmd_display = cmd
@@ -30,7 +36,8 @@ def run_command(cmd: str | Sequence[str], cwd: str | None = None) -> str:
         cmd_display = " ".join(cmd_args)
 
     try:
-        logger.info("Exec: %s en %s", cmd_display, cwd)
+        if log_exec:
+            logger.info("Exec: %s en %s", cmd_display, cwd)
         result = subprocess.run(
             cmd_args,
             cwd=cwd,

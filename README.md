@@ -46,14 +46,38 @@
 
 App to manage updates for your docker images and services (monitor status, view logs, and control deployment modes). All from a clean and responsive visual interface.
 
-## Quick Installation (Docker Compose)
+This repository is for **source code**, **issues**, and **releases**. The recommended way to run PullPilot is to place the official `docker-compose.yml` and a `.env` file on your server **without cloning** the repo. Each stable [GitHub release](https://github.com/Kernel-Nomad/PullPilot/releases) publishes the image to GHCR as `ghcr.io/kernel-nomad/pullpilot:latest` and semver tags (for example `1.2.3`). The default compose file uses `:latest`; edit the `image:` line to pin a version. To upgrade when pinned, bump the tag and run `docker compose pull && docker compose up -d`. The same `docker-compose.yml` and `.env.example` are also attached as **release assets** when you prefer downloading from the Releases page instead of `raw.githubusercontent.com`.
 
-The recommended way to deploy PullPilot is using Docker Compose.
+## Quick start (without cloning the repository)
 
-### 1. Required Directory Structure
+Use a dedicated folder for PullPilot (outside the directory tree that holds your stacks). Replace `main` with another branch name if you use one.
 
-PullPilot expects your projects to be organized in subfolders within a root folder on your server:
+```bash
+mkdir -p ~/pullpilot && cd ~/pullpilot
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
+cp .env.example .env
+```
 
+Edit `.env` and set at least `DOCKER_ROOT_PATH`, `TZ`, `AUTH_USER`, `AUTH_PASS`, and `SESSION_SECRET`. The directory at `DOCKER_ROOT_PATH` must **already exist on the host** before the first `docker compose up -d`. If you change `.env` later, run `docker compose up -d` again (or `docker compose restart`) so the container reloads the environment. To generate a stable `SESSION_SECRET`:
+
+```bash
+openssl rand -hex 32
+```
+
+Start:
+
+```bash
+docker compose up -d
+```
+
+Open the UI at [http://your-server-ip:8000](http://your-server-ip:8000) (or the host port from `PULLPILOT_PORT`).
+
+If you cloned the repo for development, you can use [`docker-compose.yml`](./docker-compose.yml) and [`.env.example`](./.env.example) from the tree instead of downloading them.
+
+### Directory layout for your stacks
+
+PullPilot expects your projects in subfolders under one root on the server:
 
 ```
 
@@ -66,29 +90,26 @@ PullPilot expects your projects to be organized in subfolders within a root fold
 
 ```
 
-> :warning: Auto-exclusion Logic: Even if placed inside the root folder, the application is hardcoded to automatically ignore folders named: pullpilot, pullpilot-ui, docker-updater, and data.
+> :warning: Auto-exclusion: folders named `pullpilot`, `pullpilot-ui`, `docker-updater`, and `data` are ignored even if they sit under the root.
 
-#### Suggested structure:
-
+Suggested layout (PullPilot config **outside** the monitored tree):
 
 ```
 
 /home/user/
-├── my_projects/         <-- Root folder monitored by PullPilot
+├── my_projects/         <-- Root monitored by PullPilot
 │   ├── plex/
 │   │   └── docker-compose.yml
-│   ├── pihole/
-│   │   └── docker-compose.yml
 │   └── ...
-│
-└── pullpilot/           <-- PullPilot installation folder (OUTSIDE the previous one)
-└── docker-compose.yml
+└── pullpilot/           <-- PullPilot folder (compose + .env only)
+    ├── docker-compose.yml
+    └── .env
 
 ```
 
-### 2. Prepare the environment
+### Environment variables (.env)
 
-Create a folder for PullPilot and add a `.env` file. Copy [`.env.example`](./.env.example) as a starting point. **Minimum** for a typical deployment:
+**Minimum** for a typical deployment:
 
 ```bash
 DOCKER_ROOT_PATH=/home/user/docker
@@ -99,11 +120,9 @@ AUTH_PASS=your_secure_password
 SESSION_SECRET=your-long-random-string
 ```
 
-The compose file bind-mounts `${DOCKER_ROOT_PATH}` to the **same absolute path** inside the container; the app uses that path to scan subfolders for `docker-compose.yml`. You can override with `PROJECTS_ROOT` in `.env` only if you need a different path than `DOCKER_ROOT_PATH`.
+The compose file bind-mounts `${DOCKER_ROOT_PATH}` at the **same absolute path** inside the container; the app scans that path for subfolders containing `docker-compose.yml` or `docker-compose.yaml`. Override with `PROJECTS_ROOT` in `.env` only if the in-container path must differ from `DOCKER_ROOT_PATH`.
 
-`SESSION_SECRET` keeps cookies valid across container restarts. If you omit it, a new secret is generated on every boot and users must sign in again. Optional: **`PULLPILOT_PORT`** (default `8000`).
-
-`DATA_DIR` defaults to `/app/data` and is already covered by the named volume `pullpilot_data` in the official compose file; you normally do not need to set it.
+If `SESSION_SECRET` is omitted, a new secret is generated on every boot and users must sign in again. Optional: **`PULLPILOT_PORT`** (default `8000`). `DATA_DIR` defaults to `/app/data` and is covered by the `pullpilot_data` volume in the official compose; you normally do not set it.
 
 #### Optional / advanced
 
@@ -121,28 +140,6 @@ SESSION_HTTPS_ONLY=true
 
 # TRUST_X_FORWARDED_FOR=true   # only behind a trusted reverse proxy
 ```
-
-### 3. docker-compose.yml
-
-Use the **versioned** `docker-compose.yml` from this repository so it always matches the published image:
-
-- **Clone** the repo into your PullPilot folder and keep the included `docker-compose.yml`, or
-- **Download** it (replace `main` with your default branch if needed):
-
-```bash
-curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
-```
-
-Do not paste a stale copy from a blog post; the file in the repo is the source of truth.
-
-### 4. Start
-
-```bash
-docker compose up -d
-
-```
-
-Access the web interface at: [http://your-server-ip:8000](http://your-server-ip:8000)
 
 ## Usage Guide
 
@@ -171,28 +168,26 @@ The **"Update All"** button in the header triggers the background process:
 
 By default, PullPilot runs a global update every day at 04:00 AM (container time).
 
-## Local Development
+## Local development (contributors only)
 
-If you want to contribute or modify the code:
+The sections above are for running PullPilot in production. Use this only if you want to change the code or build the image yourself:
 
-1. Clone the repo:
+1. Clone the repository:
 ```bash
 git clone https://github.com/Kernel-Nomad/PullPilot
-cd pullpilot
-
+cd PullPilot
 ```
 
-
-2. Build and start. The project includes a multi-stage Dockerfile that compiles the frontend (React) and prepares the backend (Python):
+2. Build and run with the multi-stage Dockerfile (React build + FastAPI):
 ```bash
 docker compose up --build
-
 ```
 
-
+For day-to-day backend/frontend development, see the `Makefile` targets in the repository (`make dev-server`, `make dev-web`).
 
 ## ⚠️ Important Notes
 
+* **Docker image:** Prefer the versioned `docker-compose.yml` from this repo (via `curl` or git). The default `image: …:latest` tracks the latest **stable** release on GHCR after you publish a non-prerelease release.
 * **Volumes:** Mount your stacks root with `${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}` so host and container share the same absolute path; that is where PullPilot looks for project folders. Override with env `PROJECTS_ROOT` only if you must use a different path inside the container.
 * **Security:** PullPilot has access to the Docker socket. Do not expose port 8000 directly to the internet without an additional security layer (like Authelia, Authentik, or Basic Auth in a Reverse Proxy).
 * **SESSION_SECRET:** Set a long, fixed random value in `.env` for real deployments. If it is unset, a new secret is generated on every process start and all sessions are invalidated on restart.
@@ -209,16 +204,41 @@ docker compose up --build
 
 App para gestionar actualizaciones de tus imágenes y servicios docker (además de visualizar el estado, logs y controlar el modo de despliegue). Todo desde una interfaz visual limpia y responsiva.
 
-## Instalación Rápida (Docker Compose)
+Este repositorio sirve para el **código fuente**, **incidencias** y **releases**. La forma recomendada de usar PullPilot es copiar el `docker-compose.yml` oficial y un `.env` en tu servidor **sin clonar** el repo. Cada [release estable en GitHub](https://github.com/Kernel-Nomad/PullPilot/releases) publica la imagen en GHCR como `ghcr.io/kernel-nomad/pullpilot:latest` y tags semver (por ejemplo `1.2.3`). El compose por defecto usa `:latest`; cambia la línea `image:` para fijar versión. Para actualizar con versión fija, sube el tag y ejecuta `docker compose pull && docker compose up -d`. Los mismos `docker-compose.yml` y `.env.example` se adjuntan como **assets del release** si prefieres descargarlos desde la pestaña Releases en lugar de `raw.githubusercontent.com`.
 
-La forma recomendada de desplegar PullPilot es usando Docker Compose.
+## Inicio rápido (sin clonar el repositorio)
 
-### 1. Estructura de directorios requerida
+Usa una carpeta dedicada para PullPilot (fuera del árbol donde guardas tus stacks). Cambia `main` por otra rama si la usas.
 
-PullPilot espera que tus proyectos estén organizados en subcarpetas dentro de una carpeta raíz en tu servidor:
+```bash
+mkdir -p ~/pullpilot && cd ~/pullpilot
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
+cp .env.example .env
+```
+
+Edita `.env` con al menos `DOCKER_ROOT_PATH`, `TZ`, `AUTH_USER`, `AUTH_PASS` y `SESSION_SECRET`. La carpeta indicada en `DOCKER_ROOT_PATH` debe **existir ya en el host** antes del primer `docker compose up -d`. Si más tarde cambias `.env`, vuelve a ejecutar `docker compose up -d` (o `docker compose restart`) para que el contenedor recargue el entorno. Para generar un `SESSION_SECRET` estable:
+
+```bash
+openssl rand -hex 32
+```
+
+Inicio:
+
+```bash
+docker compose up -d
+```
+
+Abre la interfaz en [http://tu-servidor-ip:8000](http://tu-servidor-ip:8000) (o el puerto del host definido en `PULLPILOT_PORT`).
+
+Si clonaste el repo para desarrollo, puedes usar [`docker-compose.yml`](./docker-compose.yml) y [`.env.example`](./.env.example) del árbol en lugar de descargarlos.
+
+### Estructura de directorios para tus stacks
+
+PullPilot espera proyectos en subcarpetas bajo una raíz en el servidor:
 
 ```
-/home/usuario/docker/    <-- ESTA es la carpeta que montarás
+/home/usuario/docker/    <-- Carpeta que montarás
 ├── plex/
 │   └── docker-compose.yml
 ├── pihole/
@@ -227,27 +247,25 @@ PullPilot espera que tus proyectos estén organizados en subcarpetas dentro de u
 
 ```
 
-> :warning: Lógica de auto-exclusión: Incluso si se colocan dentro de la carpeta raíz, la aplicación está programada para ignorar automáticamente las carpetas con los nombres: pullpilot, pullpilot-ui, docker-updater y data.
+> :warning: Auto-exclusión: se ignoran carpetas llamadas `pullpilot`, `pullpilot-ui`, `docker-updater` y `data` aunque estén bajo la raíz.
 
-#### Estructura sugerida:
+Estructura sugerida (config de PullPilot **fuera** del árbol monitorizado):
 
 ```
 /home/usuario/
-├── mis_proyectos/       <-- Carpeta raíz que monitoreará PullPilot
+├── mis_proyectos/       <-- Raíz que monitorea PullPilot
 │   ├── plex/
 │   │   └── docker-compose.yml
-│   ├── pihole/
-│   │   └── docker-compose.yml
 │   └── ...
-│
-└── pullpilot/           <-- Carpeta de instalación de PullPilot (FUERA de la anterior)
-    └── docker-compose.yml
+└── pullpilot/           <-- Solo compose + .env
+    ├── docker-compose.yml
+    └── .env
 
 ```
 
-### 2. Prepara el entorno
+### Variables de entorno (.env)
 
-Crea una carpeta para PullPilot y añade un `.env`. Puedes partir de [`.env.example`](./.env.example). **Mínimo** para un despliegue habitual:
+**Mínimo** para un despliegue habitual:
 
 ```bash
 DOCKER_ROOT_PATH=/home/usuario/docker
@@ -258,11 +276,9 @@ AUTH_PASS=tu_password_segura
 SESSION_SECRET=tu-cadena-larga-aleatoria
 ```
 
-El `docker-compose` monta `${DOCKER_ROOT_PATH}` en la **misma ruta absoluta** dentro del contenedor; la app usa esa ruta para buscar subcarpetas con `docker-compose.yml`. Solo necesitas `PROJECTS_ROOT` en `.env` si quieres otra ruta distinta de `DOCKER_ROOT_PATH`.
+El compose monta `${DOCKER_ROOT_PATH}` en la **misma ruta absoluta** dentro del contenedor; la app busca ahí subcarpetas con `docker-compose.yml` o `docker-compose.yaml`. Usa `PROJECTS_ROOT` en `.env` solo si la ruta dentro del contenedor debe diferir de `DOCKER_ROOT_PATH`.
 
-`SESSION_SECRET` mantiene las cookies válidas entre reinicios del contenedor. Si no lo defines, en cada arranque se genera un secreto nuevo y habrá que volver a iniciar sesión. Opcional: **`PULLPILOT_PORT`** (por defecto `8000`).
-
-`DATA_DIR` por defecto es `/app/data` y el volumen nombrado `pullpilot_data` del compose oficial ya lo cubre; normalmente no hace falta definirlo.
+Si omites `SESSION_SECRET`, en cada arranque se genera un secreto nuevo y habrá que volver a iniciar sesión. Opcional: **`PULLPILOT_PORT`** (por defecto `8000`). `DATA_DIR` por defecto es `/app/data` y el volumen `pullpilot_data` del compose oficial ya lo cubre; normalmente no hace falta definirlo.
 
 #### Opcional / avanzado
 
@@ -280,28 +296,6 @@ SESSION_HTTPS_ONLY=true
 
 # TRUST_X_FORWARDED_FOR=true   # solo tras reverse proxy de confianza
 ```
-
-### 3. docker-compose.yml
-
-Usa el `docker-compose.yml` **versionado** de este repositorio para que coincida con la imagen publicada:
-
-- **Clona** el repo en tu carpeta de PullPilot y conserva el `docker-compose.yml` incluido, o
-- **Descárgalo** (cambia `main` por tu rama por defecto si hace falta):
-
-```bash
-curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
-```
-
-Evita pegar una copia antigua desde un tutorial; el archivo del repo es la referencia.
-
-### 4. Iniciar
-
-```bash
-docker compose up -d
-
-```
-
-Accede a la interfaz web en: [http://tu-servidor-ip:8000](http://tu-servidor-ip:8000)
 
 ## Guía de Uso
 
@@ -330,28 +324,26 @@ El botón **"Actualizar Todo"** en la cabecera desencadena el proceso en segundo
 
 Por defecto, PullPilot ejecuta una actualización global todos los días a las 04:00 AM (hora del contenedor).
 
-## Desarrollo Local
+## Desarrollo local (solo contribuidores)
 
-Si quieres contribuir o modificar el código:
+Las secciones anteriores son para ejecutar PullPilot en producción. Usa esto solo si quieres modificar el código o construir la imagen tú mismo:
 
-1. Clona el repo:
+1. Clona el repositorio:
 ```bash
 git clone https://github.com/Kernel-Nomad/PullPilot
-cd pullpilot
-
+cd PullPilot
 ```
 
-
-2. Construye y levanta. El proyecto incluye un Dockerfile multi-stage que compila el frontend (React) y prepara el backend (Python):
+2. Construye y levanta con el Dockerfile multi-stage (frontend React + backend Python):
 ```bash
 docker compose up --build
-
 ```
 
-
+Para desarrollo diario del backend o frontend, usa los objetivos del `Makefile` del repo (`make dev-server`, `make dev-web`).
 
 ## ⚠️ Notas Importantes
 
+* **Imagen Docker:** Usa el `docker-compose.yml` versionado de este repo (vía `curl` o git). La línea `image: …:latest` apunta a la última release **estable** en GHCR tras publicar un release que no sea prerelease.
 * **Volúmenes:** Monta la carpeta de stacks con `${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}` para que host y contenedor compartan la misma ruta absoluta; ahí busca PullPilot las carpetas de proyecto. Usa la variable de entorno `PROJECTS_ROOT` solo si necesitas otra ruta dentro del contenedor.
 * **Seguridad:** PullPilot tiene acceso al socket de Docker. No expongas el puerto 8000 directamente a internet sin una capa de seguridad adicional (como Authelia, Authentik o Basic Auth en un Reverse Proxy).
 * **SESSION_SECRET:** En despliegue real define en `.env` un valor aleatorio largo y fijo. Si no se define, cada arranque del proceso genera un secreto nuevo y las sesiones caducan al reiniciar.

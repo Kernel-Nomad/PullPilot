@@ -30,6 +30,15 @@ const resources = {
         updating: "Actualizando...",
         updating_btn: "Actualizando...",
         starting: "Iniciando...",
+        empty_projects_title: "No hay proyectos detectados",
+        empty_projects_intro:
+          "Si acabas de instalar PullPilot con Docker Compose, revisa la configuracion del servidor:",
+        empty_projects_path:
+          "La variable DOCKER_ROOT_PATH en tu .env debe apuntar a una carpeta que exista en el host (creala antes del primer arranque) y este montada en el contenedor con la misma ruta absoluta.",
+        empty_projects_compose:
+          "Dentro de esa carpeta, cada proyecto debe ser una subcarpeta que contenga docker-compose.yml o docker-compose.yaml.",
+        empty_projects_volume:
+          "El servicio en docker-compose.yml debe incluir el volumen ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH} (como en el archivo oficial). Tras cambiar .env, reinicia el contenedor (docker compose up -d o restart).",
       },
       card: {
         containers: "Contenedores",
@@ -133,6 +142,15 @@ const resources = {
         updating: "Updating...",
         updating_btn: "Updating...",
         starting: "Starting...",
+        empty_projects_title: "No projects detected",
+        empty_projects_intro:
+          "If you just installed PullPilot with Docker Compose, check the following:",
+        empty_projects_path:
+          "DOCKER_ROOT_PATH in your .env must point to a folder that exists on the host (create it before the first start) and is bind-mounted into the container at the same absolute path.",
+        empty_projects_compose:
+          "Under that folder, each project should be a subfolder containing docker-compose.yml or docker-compose.yaml.",
+        empty_projects_volume:
+          "The compose service must include the volume ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH} (as in the official file). After changing .env, restart the container (docker compose up -d or restart).",
       },
       card: {
         containers: "Containers",
