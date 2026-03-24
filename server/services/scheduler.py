@@ -1,4 +1,3 @@
-import json
 from threading import Lock
 import time
 
@@ -8,9 +7,10 @@ from apscheduler.triggers.date import DateTrigger
 
 from server.config import logger
 from server.database import SessionLocal
-from server.models.db import ProjectSettings, ScheduledTask, UpdateLog
+from server.models.db import ProjectSettings, ScheduledTask
 from server.services.docker import run_command
 from server.services.projects import update_single_project_logic
+from server.services.update_logs import persist_update_log
 
 
 global_update_status = {
@@ -22,7 +22,53 @@ global_update_status = {
 }
 
 scheduler = BackgroundScheduler()
+
+
+def snapshot_global_update_status() -> dict[str, object]:
+    """Copia defensiva para lectores HTTP (evita compartir la lista `processed` con el job)."""
+    s = global_update_status
+    processed = s.get("processed")
+    if isinstance(processed, list):
+        processed_copy: list[object] = list(processed)
+    else:
+        processed_copy = []
+    return {
+        "is_running": s["is_running"],
+        "total": s["total"],
+        "current": s["current"],
+        "current_project": s["current_project"],
+        "processed": processed_copy,
+    }
 global_update_lock = Lock()
+
+
+def build_trigger(task_type: str, expression: str) -> CronTrigger | DateTrigger:
+    """Construye un trigger de APScheduler; lanza ValueError si la expresion no es valida."""
+    expr = (expression or "").strip()
+    if task_type == "cron":
+        if not expr:
+            raise ValueError("La expresion cron esta vacia")
+        parts = expr.split()
+        if len(parts) < 5:
+            raise ValueError("La expresion cron debe tener 5 campos")
+        try:
+            return CronTrigger(
+                minute=parts[0],
+                hour=parts[1],
+                day=parts[2],
+                month=parts[3],
+                day_of_week=parts[4],
+            )
+        except Exception as exc:
+            raise ValueError(f"Cron invalido: {exc}") from exc
+    if task_type == "date":
+        if not expr:
+            raise ValueError("La fecha programada esta vacia")
+        try:
+            return DateTrigger(run_date=expr)
+        except Exception as exc:
+            raise ValueError(f"Fecha invalida: {exc}") from exc
+    raise ValueError(f"Tipo de tarea no soportado: {task_type}")
 
 
 def global_update_job() -> None:
@@ -90,13 +136,12 @@ def global_update_job() -> None:
         summary = f"Global Update: {success_count} OK, {error_count} Errores"
         status = "SUCCESS" if error_count == 0 else "ERROR"
 
-        new_log = UpdateLog(
+        persist_update_log(
+            db,
             status=status,
             summary=summary,
-            details=json.dumps(global_logs),
+            details=global_logs,
         )
-        db.add(new_log)
-        db.commit()
     finally:
         db.close()
         global_update_status["is_running"] = False
@@ -116,15 +161,23 @@ def job_wrapper(target: str) -> None:
         success, logs = update_single_project_logic(target, db)
 
         summary = f"[Scheduled] {target}: {'OK' if success else 'ERROR'}"
-        new_log = UpdateLog(
+        persist_update_log(
+            db,
             status="SUCCESS" if success else "ERROR",
             summary=summary,
-            details=json.dumps({target: logs}),
+            details={target: logs},
         )
-        db.add(new_log)
-        db.commit()
     except Exception as exc:
         logger.error("Error en tarea programada %s: %s", target, exc)
+        try:
+            persist_update_log(
+                db,
+                status="ERROR",
+                summary=f"[Scheduled] {target}: EXCEPCION",
+                details={target: [str(exc)]},
+            )
+        except Exception as log_exc:
+            logger.error("No se pudo persistir log de error para %s: %s", target, log_exc)
     finally:
         db.close()
 
@@ -139,31 +192,16 @@ def refresh_scheduler_jobs() -> None:
 
         for task in tasks:
             try:
-                trigger = None
                 job_id = f"job_{task.id}"
-
-                if task.task_type == "cron":
-                    parts = task.expression.split()
-                    if len(parts) >= 5:
-                        trigger = CronTrigger(
-                            minute=parts[0],
-                            hour=parts[1],
-                            day=parts[2],
-                            month=parts[3],
-                            day_of_week=parts[4],
-                        )
-                elif task.task_type == "date":
-                    trigger = DateTrigger(run_date=task.expression)
-
-                if trigger:
-                    scheduler.add_job(
-                        job_wrapper,
-                        trigger,
-                        args=[task.target],
-                        id=job_id,
-                        replace_existing=True,
-                    )
-                    count += 1
+                trigger = build_trigger(task.task_type, task.expression)
+                scheduler.add_job(
+                    job_wrapper,
+                    trigger,
+                    args=[task.target],
+                    id=job_id,
+                    replace_existing=True,
+                )
+                count += 1
             except Exception as exc:
                 logger.error("Error cargando tarea %s: %s", task.id, exc)
     finally:

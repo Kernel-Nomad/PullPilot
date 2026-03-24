@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Calendar, ChevronRight, Clock, Plus, Shield, Trash2 } from "lucide-react";
 
 export default function ScheduleView({
@@ -10,6 +11,8 @@ export default function ScheduleView({
   onDeleteSchedule,
   formatExpression,
 }) {
+  const [taskType, setTaskType] = useState("cron");
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -20,6 +23,28 @@ export default function ScheduleView({
           onSubmit={onCreateSchedule}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end"
         >
+          <input type="hidden" name="task_type" value={taskType} />
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+              {t("schedule.task_type")}
+            </label>
+            <div className="relative">
+              <select
+                value={taskType}
+                onChange={(event) => setTaskType(event.target.value)}
+                className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-700"
+              >
+                <option value="cron">{t("schedule.type_cron")}</option>
+                <option value="date">{t("schedule.type_once")}</option>
+              </select>
+              <ChevronRight
+                className="absolute right-3 top-3 text-slate-400 rotate-90 pointer-events-none"
+                size={16}
+              />
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
               {t("schedule.target")}
@@ -43,29 +68,31 @@ export default function ScheduleView({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              {t("schedule.frequency")}
-            </label>
-            <div className="relative">
-              <select
-                name="frequency"
-                className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-700"
-                onChange={(event) => onSelectedFreqChange(event.target.value)}
-                value={selectedFreq}
-              >
-                <option value="daily">{t("schedule.freq_daily")}</option>
-                <option value="weekly">{t("schedule.freq_weekly")}</option>
-                <option value="monthly">{t("schedule.freq_monthly")}</option>
-              </select>
-              <ChevronRight
-                className="absolute right-3 top-3 text-slate-400 rotate-90 pointer-events-none"
-                size={16}
-              />
+          {taskType === "cron" && (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                {t("schedule.frequency")}
+              </label>
+              <div className="relative">
+                <select
+                  name="frequency"
+                  className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-700"
+                  onChange={(event) => onSelectedFreqChange(event.target.value)}
+                  value={selectedFreq}
+                >
+                  <option value="daily">{t("schedule.freq_daily")}</option>
+                  <option value="weekly">{t("schedule.freq_weekly")}</option>
+                  <option value="monthly">{t("schedule.freq_monthly")}</option>
+                </select>
+                <ChevronRight
+                  className="absolute right-3 top-3 text-slate-400 rotate-90 pointer-events-none"
+                  size={16}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {selectedFreq === "weekly" && (
+          {taskType === "cron" && selectedFreq === "weekly" && (
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                 {t("schedule.day_week")}
@@ -89,7 +116,7 @@ export default function ScheduleView({
             </div>
           )}
 
-          {selectedFreq === "monthly" && (
+          {taskType === "cron" && selectedFreq === "monthly" && (
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                 {t("schedule.day_month")}
@@ -113,36 +140,52 @@ export default function ScheduleView({
             </div>
           )}
 
-          {selectedFreq === "daily" && <div className="hidden lg:block" />}
+          {taskType === "cron" && selectedFreq === "daily" && <div className="hidden lg:block" />}
 
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              {t("schedule.time")}
-            </label>
-            <div className="flex gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-3">
+          {taskType === "cron" && (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                {t("schedule.time")}
+              </label>
+              <div className="flex gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <input
+                  type="number"
+                  name="hour"
+                  min="0"
+                  max="23"
+                  placeholder="04"
+                  defaultValue="04"
+                  required
+                  className="bg-transparent w-full text-center text-sm font-medium focus:outline-none text-slate-700 placeholder-slate-300"
+                />
+                <span className="font-bold text-slate-300">:</span>
+                <input
+                  type="number"
+                  name="minute"
+                  min="0"
+                  max="59"
+                  placeholder="00"
+                  defaultValue="00"
+                  required
+                  className="bg-transparent w-full text-center text-sm font-medium focus:outline-none text-slate-700 placeholder-slate-300"
+                />
+              </div>
+            </div>
+          )}
+
+          {taskType === "date" && (
+            <div className="flex flex-col gap-2 lg:col-span-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                {t("schedule.datetime_once")}
+              </label>
               <input
-                type="number"
-                name="hour"
-                min="0"
-                max="23"
-                placeholder="04"
-                defaultValue="04"
+                type="datetime-local"
+                name="date_iso"
                 required
-                className="bg-transparent w-full text-center text-sm font-medium focus:outline-none text-slate-700 placeholder-slate-300"
-              />
-              <span className="font-bold text-slate-300">:</span>
-              <input
-                type="number"
-                name="minute"
-                min="0"
-                max="59"
-                placeholder="00"
-                defaultValue="00"
-                required
-                className="bg-transparent w-full text-center text-sm font-medium focus:outline-none text-slate-700 placeholder-slate-300"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 text-slate-700"
               />
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
@@ -180,7 +223,7 @@ export default function ScheduleView({
                     )}
                   </td>
                   <td className="p-4 font-mono text-slate-600 text-xs md:text-sm">
-                    {formatExpression(schedule.expression)}
+                    {formatExpression(schedule.expression, schedule.task_type)}
                   </td>
                   <td className="p-4 text-right">
                     <button

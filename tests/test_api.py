@@ -1,0 +1,190 @@
+import pytest
+import server.app as app_module
+import server.services.projects as projects_module
+from fastapi.testclient import TestClient
+from server.database import SessionLocal
+from server.models.db import ProjectSettings
+
+
+def test_update_status(client: TestClient) -> None:
+    response = client.get("/api/update-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_running"] is False
+    assert "processed" in data
+
+
+def test_update_status_processed_is_snapshot_not_alias(client: TestClient) -> None:
+    data = client.get("/api/update-status").json()
+    data["processed"].append({"name": "__fake__", "status": "OK"})
+    data2 = client.get("/api/update-status").json()
+    assert not any(p.get("name") == "__fake__" for p in data2.get("processed", []))
+
+
+def test_history_empty(client: TestClient) -> None:
+    response = client.get("/api/history")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_create_schedule_invalid_hour(client: TestClient) -> None:
+    response = client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "cron",
+            "frequency": "daily",
+            "hour": 99,
+            "minute": 0,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_create_schedule_date_requires_iso(client: TestClient) -> None:
+    response = client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "date",
+            "frequency": "daily",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_create_schedule_cron(client: TestClient) -> None:
+    response = client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "cron",
+            "frequency": "daily",
+            "hour": 4,
+            "minute": 30,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["task_type"] == "cron"
+    assert data["expression"] == "30 4 * * *"
+    assert data["target"] == "GLOBAL"
+
+
+def test_create_schedule_date(client: TestClient) -> None:
+    response = client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "date",
+            "frequency": "daily",
+            "date_iso": "2027-06-01T08:15",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["expression"] == "2027-06-01 08:15:00"
+
+
+def test_schedules_list_shape(client: TestClient) -> None:
+    client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "cron",
+            "frequency": "daily",
+            "hour": 1,
+            "minute": 0,
+        },
+    )
+    response = client.get("/api/schedules")
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) >= 1
+    row = rows[0]
+    required = {"id", "target", "task_type", "expression", "active"}
+    assert required.issubset(set(row.keys()))
+
+
+def test_get_projects(client: TestClient) -> None:
+    response = client.get("/api/projects")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_delete_schedule_not_found(client: TestClient) -> None:
+    response = client.delete("/api/schedules/99999")
+    assert response.status_code == 404
+
+
+def test_trigger_update_all(client: TestClient) -> None:
+    response = client.post("/api/update-all")
+    assert response.status_code == 200
+    data = response.json()
+    assert "message" in data
+
+
+def test_create_schedule_rejects_unschedulable_date(client: TestClient) -> None:
+    response = client.post(
+        "/api/schedules",
+        json={
+            "target": "GLOBAL",
+            "task_type": "date",
+            "frequency": "daily",
+            "date_iso": "__not_a_parseable_datetime__",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_build_trigger_rejects_short_cron() -> None:
+    from server.services.scheduler import build_trigger
+
+    with pytest.raises(ValueError, match="5 campos"):
+        build_trigger("cron", "1 2 3")
+
+
+def test_api_requires_session_when_auth_enabled(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "AUTH_USER", "admin")
+    monkeypatch.setattr(app_module, "AUTH_PASS", "secret")
+    response = client.get("/api/projects")
+    assert response.status_code == 401
+    assert response.json().get("detail") == "Sesión expirada"
+
+
+def test_scan_syncs_stored_project_path(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    root = tmp_path / "projects_root"
+    proj_dir = root / "myapp"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    monkeypatch.setattr(projects_module, "PROJECTS_ROOT", root)
+
+    def _fake_run_command(*_args, **_kwargs):
+        return ""
+
+    monkeypatch.setattr(projects_module, "run_command", _fake_run_command)
+
+    r1 = client.get("/api/projects")
+    assert r1.status_code == 200
+    db = SessionLocal()
+    try:
+        row = db.query(ProjectSettings).filter(ProjectSettings.name == "myapp").first()
+        assert row is not None
+        assert row.path == str(proj_dir)
+        row.path = "/stale/wrong/path"
+        db.commit()
+    finally:
+        db.close()
+
+    r2 = client.get("/api/projects")
+    assert r2.status_code == 200
+    db = SessionLocal()
+    try:
+        row = db.query(ProjectSettings).filter(ProjectSettings.name == "myapp").first()
+        assert row is not None
+        assert row.path == str(proj_dir)
+    finally:
+        db.close()

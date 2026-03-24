@@ -3,6 +3,7 @@ import json
 import os
 import time
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from server.config import HEALTHCHECK_TIMEOUT, PROJECTS_ROOT, logger
@@ -19,6 +20,7 @@ def scan_projects_logic(db: Session) -> list[dict]:
         logger.warning("Directorio PROJECTS_ROOT no existe: %s", PROJECTS_ROOT)
         return []
 
+    pending_db_write = False
     for entry in os.listdir(PROJECTS_ROOT):
         if entry.lower() in IGNORED_PROJECT_NAMES:
             continue
@@ -37,8 +39,10 @@ def scan_projects_logic(db: Session) -> list[dict]:
         if not proj:
             proj = ProjectSettings(name=entry, path=str(path))
             db.add(proj)
-            db.commit()
-            db.refresh(proj)
+            pending_db_write = True
+        elif proj.path != str(path):
+            proj.path = str(path)
+            pending_db_write = True
 
         try:
             output = run_command(f"{COMPOSE_CMD} ps -q", cwd=str(path))
@@ -58,6 +62,15 @@ def scan_projects_logic(db: Session) -> list[dict]:
                 "full_stop": proj.full_stop,
             }
         )
+
+    if pending_db_write:
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            logger.warning(
+                "No se pudo persistir cambios del escaneo de proyectos (altas o rutas)."
+            )
 
     return found
 

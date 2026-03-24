@@ -10,9 +10,12 @@ from starlette.middleware.sessions import SessionMiddleware
 from server.config import (
     AUTH_PASS,
     AUTH_USER,
+    CORS_ORIGINS,
+    PROJECTS_ROOT,
     SESSION_HTTPS_ONLY,
     SESSION_SECRET,
     STATIC_DIR,
+    logger,
 )
 from server.database import Base, engine
 from server.models import db as _db_models  # noqa: F401
@@ -26,12 +29,22 @@ from server.services.scheduler import start_scheduler, stop_scheduler
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    if not PROJECTS_ROOT.exists():
+        logger.warning(
+            "PROJECTS_ROOT no existe (%s). Revisa DOCKER_ROOT_PATH y el volumen bind en "
+            "docker-compose; la lista de proyectos estará vacía hasta que la ruta exista.",
+            PROJECTS_ROOT,
+        )
     start_scheduler()
     yield
     stop_scheduler()
 
 
 app = FastAPI(title="PullPilot API", lifespan=lifespan)
+
+# Orden de middleware (Starlette): lo último en add_middleware recibe la petición primero.
+# CORSMiddleware (externo) → SessionMiddleware → rutas y este auth_middleware (http),
+# de modo que request.session esté disponible aquí.
 
 
 @app.middleware("http")
@@ -61,7 +74,7 @@ async def auth_middleware(request: Request, call_next):
     user = request.session.get("user")
     if not user:
         if path.startswith("/api"):
-            return JSONResponse(status_code=401, content={"detail": "Sesion expirada"})
+            return JSONResponse(status_code=401, content={"detail": "Sesión expirada"})
         return RedirectResponse(url="/login")
 
     request.session["user"] = user
@@ -79,7 +92,7 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

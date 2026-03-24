@@ -17,9 +17,36 @@ dependencies = [
   "itsdangerous==2.2.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4.0",
+]
+
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["server*"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["server", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = [
+  "E501",
+  "I001",
+  "UP006",
+  "UP022",
+  "UP035",
+  "UP045",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

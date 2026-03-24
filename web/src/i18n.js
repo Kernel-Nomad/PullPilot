@@ -38,6 +38,10 @@ const resources = {
       },
       schedule: {
         new_schedule: "Nueva Programacion",
+        task_type: "Tipo",
+        type_cron: "Recurrente (cron)",
+        type_once: "Una sola vez",
+        datetime_once: "Fecha y hora",
         target: "Objetivo",
         target_global: "Todo el Sistema (Global)",
         frequency: "Frecuencia",
@@ -56,6 +60,7 @@ const resources = {
           daily: "Diaria a las {{time}}",
           weekly: "Semanal ({{day}}) a las {{time}}",
           monthly: "Mensual (Dia {{day}}) a las {{time}}",
+          once: "Una vez: {{at}}",
         },
       },
       history: {
@@ -81,6 +86,8 @@ const resources = {
         mock_global: "(Simulacion) Proceso global iniciado en segundo plano.",
         schedule_error: "Error al crear programacion",
         config_error: "Error al guardar configuracion",
+        projects_load_error: "El servidor respondio con error al cargar proyectos. Revisa el backend.",
+        history_load_error: "No se pudo cargar el historial. Revisa el backend.",
       },
       days: {
         mon: "Lunes",
@@ -134,6 +141,10 @@ const resources = {
       },
       schedule: {
         new_schedule: "New Schedule",
+        task_type: "Type",
+        type_cron: "Recurring (cron)",
+        type_once: "One-time",
+        datetime_once: "Date and time",
         target: "Target",
         target_global: "Whole System (Global)",
         frequency: "Frequency",
@@ -152,6 +163,7 @@ const resources = {
           daily: "Daily at {{time}}",
           weekly: "Weekly ({{day}}) at {{time}}",
           monthly: "Monthly (Day {{day}}) at {{time}}",
+          once: "Once: {{at}}",
         },
       },
       history: {
@@ -177,6 +189,8 @@ const resources = {
         mock_global: "(Simulation) Global process started in background.",
         schedule_error: "Error creating schedule",
         config_error: "Error saving configuration",
+        projects_load_error: "The server returned an error while loading projects. Check the backend.",
+        history_load_error: "Could not load history. Check the backend.",
       },
       days: {
         mon: "Monday",

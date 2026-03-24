@@ -1,3 +1,6 @@
+# PullPilot — requisitos en .env: DOCKER_ROOT_PATH, TZ (y credenciales; ver README y .env.example).
+# Este archivo es la referencia versionada; descárgalo o clónalo desde el repo en lugar de copiar YAML a mano.
+# https://github.com/Kernel-Nomad/PullPilot
 services:
   pullpilot:
     container_name: pullpilot
@@ -13,7 +16,6 @@ services:
       - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
     environment:
       - TZ=${TZ}
-      - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
 
 volumes:
   pullpilot_data:

@@ -16,6 +16,7 @@ import {
   fetchProjects,
   fetchSchedules,
   fetchUpdateStatus,
+  isBackendUnreachableError,
   logout,
   SESSION_EXPIRED_ERROR,
   toggleProjectSetting,
@@ -67,13 +68,21 @@ export default function App() {
       setProjects(data);
       setIsMockMode(false);
     } catch (error) {
-      if (error.message !== SESSION_EXPIRED_ERROR) {
+      if (error.message === SESSION_EXPIRED_ERROR) {
+        return;
+      }
+      if (isBackendUnreachableError(error)) {
         console.warn("Backend no detectado. Cargando datos de prueba (mock mode).", error);
         setProjects(MOCK_PROJECTS);
         setIsMockMode(true);
+        return;
       }
+      console.error("Error cargando proyectos", error);
+      setProjects([]);
+      setIsMockMode(false);
+      alert(t("alerts.projects_load_error"));
     }
-  }, [requestContext]);
+  }, [requestContext, t]);
 
   const loadHistory = useCallback(
     async (allowMockFallback = true) => {
@@ -82,14 +91,21 @@ export default function App() {
         const data = await fetchHistory(requestContext);
         setHistory(data);
       } catch (error) {
-        if (allowMockFallback && error.message !== SESSION_EXPIRED_ERROR) {
-          setHistory(MOCK_HISTORY);
+        if (error.message === SESSION_EXPIRED_ERROR) {
+          return;
         }
+        if (allowMockFallback && isBackendUnreachableError(error)) {
+          setHistory(MOCK_HISTORY);
+          return;
+        }
+        console.error("Error cargando historial", error);
+        setHistory([]);
+        alert(t("alerts.history_load_error"));
       } finally {
         setHistoryLoading(false);
       }
     },
-    [requestContext]
+    [requestContext, t]
   );
 
   const loadSchedules = useCallback(async () => {
@@ -195,29 +211,47 @@ export default function App() {
     event.preventDefault();
 
     const formData = new FormData(event.target);
-    const hour = Number.parseInt(formData.get("hour"), 10);
-    const minute = Number.parseInt(formData.get("minute"), 10);
-    if (
-      Number.isNaN(hour) ||
-      Number.isNaN(minute) ||
-      hour < 0 ||
-      hour > 23 ||
-      minute < 0 ||
-      minute > 59
-    ) {
-      alert(t("alerts.schedule_error"));
-      return;
-    }
+    const taskType = formData.get("task_type") || "cron";
+    const target = formData.get("target");
 
-    const payload = {
-      target: formData.get("target"),
-      task_type: "cron",
-      frequency: formData.get("frequency"),
-      week_day: formData.get("week_day") || "*",
-      day_of_month: formData.get("day_of_month") || "1",
-      hour,
-      minute,
-    };
+    let payload;
+    if (taskType === "date") {
+      const dateIso = formData.get("date_iso");
+      if (!dateIso || String(dateIso).trim() === "") {
+        alert(t("alerts.schedule_error"));
+        return;
+      }
+      payload = {
+        target,
+        task_type: "date",
+        frequency: "daily",
+        date_iso: dateIso,
+      };
+    } else {
+      const hour = Number.parseInt(formData.get("hour"), 10);
+      const minute = Number.parseInt(formData.get("minute"), 10);
+      if (
+        Number.isNaN(hour) ||
+        Number.isNaN(minute) ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59
+      ) {
+        alert(t("alerts.schedule_error"));
+        return;
+      }
+
+      payload = {
+        target,
+        task_type: "cron",
+        frequency: formData.get("frequency"),
+        week_day: formData.get("week_day") || "*",
+        day_of_month: formData.get("day_of_month") || "1",
+        hour,
+        minute,
+      };
+    }
 
     try {
       await createSchedule(payload, requestContext);
@@ -294,9 +328,13 @@ export default function App() {
     i18n.changeLanguage(newLang);
   };
 
-  const formatExpression = (expression) => {
+  const formatExpression = (expression, taskType = "cron") => {
     if (!expression) {
       return "";
+    }
+
+    if (taskType === "date") {
+      return t("schedule.format.once", { at: expression });
     }
 
     const parts = expression.split(" ");
