@@ -14,8 +14,7 @@ dependencies = [
   "sqlalchemy==2.0.25",
   "apscheduler==3.10.4",
   "python-multipart==0.0.6",
-  "requests==2.31.0",
-  "itsdangerous",
+  "itsdangerous==2.2.0",
 ]
 
 [tool.setuptools]

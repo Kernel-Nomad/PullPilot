@@ -1,4 +1,4 @@
-import { CheckCircle, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 export default function HistoryView({ t, history, historyLoading, onRefresh, onSelectLog }) {
   return (
@@ -55,9 +55,19 @@ export default function HistoryView({ t, history, historyLoading, onRefresh, onS
                 </td>
               </tr>
             ))}
-            {history.length === 0 && (
+            {historyLoading && (
               <tr>
-                <td colSpan="4" className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    {t("history.refresh")}
+                  </span>
+                </td>
+              </tr>
+            )}
+            {!historyLoading && history.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
                   {t("history.no_logs")}
                 </td>
               </tr>

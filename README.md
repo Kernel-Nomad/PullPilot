@@ -120,7 +120,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
       - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
-      - ./sessions:/app/sessions
     environment:
       - TZ=${TZ}
       - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
@@ -137,7 +136,7 @@ docker compose up -d
 
 ```
 
-Access the web interface at: [http://your-server-ip:8000](https://www.google.com/search?q=http://your-server-ip:8000)
+Access the web interface at: [http://your-server-ip:8000](http://your-server-ip:8000)
 
 ## Usage Guide
 
@@ -172,7 +171,7 @@ If you want to contribute or modify the code:
 
 1. Clone the repo:
 ```bash
-git clone [https://github.com/Kernel-Nomad/PullPilot](https://github.com/Kernel-Nomad/PullPilot)
+git clone https://github.com/Kernel-Nomad/PullPilot
 cd pullpilot
 
 ```
@@ -269,7 +268,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
       - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
-      - ./sessions:/app/sessions
     environment:
       - TZ=${TZ}
       - PROJECTS_ROOT=${DOCKER_ROOT_PATH}
@@ -286,7 +284,7 @@ docker compose up -d
 
 ```
 
-Accede a la interfaz web en: [http://tu-servidor-ip:8000](https://www.google.com/search?q=http://tu-servidor-ip:8000)
+Accede a la interfaz web en: [http://tu-servidor-ip:8000](http://tu-servidor-ip:8000)
 
 ## Guía de Uso
 
@@ -321,7 +319,7 @@ Si quieres contribuir o modificar el código:
 
 1. Clona el repo:
 ```bash
-git clone [https://github.com/Kernel-Nomad/PullPilot](https://github.com/Kernel-Nomad/PullPilot)
+git clone https://github.com/Kernel-Nomad/PullPilot
 cd pullpilot
 
 ```

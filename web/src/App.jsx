@@ -195,14 +195,28 @@ export default function App() {
     event.preventDefault();
 
     const formData = new FormData(event.target);
+    const hour = Number.parseInt(formData.get("hour"), 10);
+    const minute = Number.parseInt(formData.get("minute"), 10);
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minute) ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59
+    ) {
+      alert(t("alerts.schedule_error"));
+      return;
+    }
+
     const payload = {
       target: formData.get("target"),
       task_type: "cron",
       frequency: formData.get("frequency"),
       week_day: formData.get("week_day") || "*",
       day_of_month: formData.get("day_of_month") || "1",
-      hour: parseInt(formData.get("hour"), 10),
-      minute: parseInt(formData.get("minute"), 10),
+      hour,
+      minute,
     };
 
     try {
@@ -226,7 +240,7 @@ export default function App() {
       await loadSchedules();
     } catch (error) {
       if (error.message !== SESSION_EXPIRED_ERROR) {
-        console.error("Error deleting schedule", error);
+        alert(t("alerts.schedule_error"));
       }
     }
   };
@@ -270,7 +284,7 @@ export default function App() {
         })
       );
       if (error.message !== SESSION_EXPIRED_ERROR) {
-        console.error(t("alerts.config_error"));
+        alert(t("alerts.config_error"));
       }
     }
   };

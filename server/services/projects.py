@@ -130,7 +130,7 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
 
             all_healthy = True
             for container_id in container_ids:
-                inspect_raw = run_command(f"docker inspect {container_id}")
+                inspect_raw = run_command(["docker", "inspect", container_id])
                 data = json.loads(inspect_raw)[0]
                 state = data.get("State", {})
                 status = state.get("Status")
@@ -154,6 +154,11 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
 
                 if health == "starting":
                     all_healthy = False
+                    continue
+
+                # Si no hay HEALTHCHECK, exigimos al menos estado running.
+                if health is None and status != "running":
+                    all_healthy = False
 
             if all_healthy:
                 log("Healthcheck superado: todos los servicios estables.", "SUCCESS")
@@ -169,7 +174,7 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
         if git_hash_before:
             log("INICIANDO ROLLBACK AUTOMATICO...", "WARN")
             try:
-                run_command(f"git reset --hard {git_hash_before}", cwd=project.path)
+                run_command(["git", "reset", "--hard", git_hash_before], cwd=project.path)
                 log(f"Codigo revertido a commit {git_hash_before[:7]}.")
 
                 log("Forzando redespliegue de version anterior...")

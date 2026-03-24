@@ -1,4 +1,5 @@
 SHELL := /bin/sh
+IMAGE_NAME ?= ghcr.io/kernel-nomad/pullpilot
 
 .PHONY: dev-server dev-web build up lint
 
@@ -9,7 +10,7 @@ dev-web:
 	cd web && npm run dev
 
 build:
-	docker build -t pullpilot .
+	docker build -t $(IMAGE_NAME) -t pullpilot .
 
 up:
 	docker compose up -d

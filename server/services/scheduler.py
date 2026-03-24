@@ -1,4 +1,5 @@
 import json
+from threading import Lock
 import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -21,10 +22,11 @@ global_update_status = {
 }
 
 scheduler = BackgroundScheduler()
+global_update_lock = Lock()
 
 
 def global_update_job() -> None:
-    if global_update_status["is_running"]:
+    if not global_update_lock.acquire(blocking=False):
         logger.warning("Actualizacion global ya en curso. Omitiendo tarea.")
         return
 
@@ -99,6 +101,7 @@ def global_update_job() -> None:
         db.close()
         global_update_status["is_running"] = False
         global_update_status["current_project"] = ""
+        global_update_lock.release()
 
 
 def job_wrapper(target: str) -> None:

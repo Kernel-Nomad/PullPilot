@@ -31,8 +31,8 @@ class UpdateLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(
-        DateTime,
-        default=datetime.datetime.now,
+        DateTime(timezone=True),
+        default=lambda: datetime.datetime.now(datetime.UTC),
     )
     status: Mapped[str] = mapped_column(String)
     summary: Mapped[str] = mapped_column(Text)

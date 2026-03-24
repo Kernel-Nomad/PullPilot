@@ -65,7 +65,7 @@ async def auth_middleware(request: Request, call_next):
         return RedirectResponse(url="/login")
 
     request.session["user"] = user
-    request.session["last_seen"] = int(datetime.datetime.utcnow().timestamp())
+    request.session["last_seen"] = int(datetime.datetime.now(datetime.UTC).timestamp())
     return await call_next(request)
 
 

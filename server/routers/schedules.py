@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from server.database import get_db
@@ -45,8 +45,9 @@ def create_schedule(data: ScheduleInput, db: Session = Depends(get_db)):
 @router.delete("/schedules/{schedule_id}")
 def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
     task = db.query(ScheduledTask).filter(ScheduledTask.id == schedule_id).first()
-    if task:
-        db.delete(task)
-        db.commit()
-        refresh_scheduler_jobs()
+    if not task:
+        raise HTTPException(status_code=404, detail="Programacion no encontrada")
+    db.delete(task)
+    db.commit()
+    refresh_scheduler_jobs()
     return {"status": "ok"}

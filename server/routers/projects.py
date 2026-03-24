@@ -40,16 +40,18 @@ def update_project(name: str, db: Session = Depends(get_db)):
 @router.post("/projects/{name}/toggle_exclude")
 def toggle_exclude(name: str, db: Session = Depends(get_db)):
     project = db.query(ProjectSettings).filter(ProjectSettings.name == name).first()
-    if project:
-        project.excluded = not project.excluded
-        db.commit()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    project.excluded = not project.excluded
+    db.commit()
     return {"status": "ok"}
 
 
 @router.post("/projects/{name}/toggle_fullstop")
 def toggle_fullstop(name: str, db: Session = Depends(get_db)):
     project = db.query(ProjectSettings).filter(ProjectSettings.name == name).first()
-    if project:
-        project.full_stop = not project.full_stop
-        db.commit()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    project.full_stop = not project.full_stop
+    db.commit()
     return {"status": "ok"}
