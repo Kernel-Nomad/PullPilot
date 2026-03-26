@@ -1,5 +1,7 @@
 SHELL := /bin/sh
 IMAGE_NAME ?= ghcr.io/kernel-nomad/pullpilot
+# Intérprete Python para test/lint (3.11+). Con venv activado suele bastar `python`; si `python3` del sistema es antiguo: PY=python3.11 make test
+PY ?= python
 
 .PHONY: dev-server dev-web build up lint test
 
@@ -13,11 +15,10 @@ build:
 	docker build -t $(IMAGE_NAME) -t pullpilot .
 
 up:
-	@test -f .env || (printf '%s\n' "Missing .env — copy and edit: cp .env.example .env (set DOCKER_ROOT_PATH at minimum)." >&2; exit 1)
 	docker compose up -d
 
 lint:
-	ruff check server tests && python -m compileall server && cd web && npm run lint && npm run build
+	ruff check server tests && $(PY) -m compileall server && cd web && npm run lint && npm run build
 
 test:
-	python3 -m pytest tests/
+	$(PY) -m pytest tests/

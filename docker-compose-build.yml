@@ -1,7 +1,10 @@
-# PullPilot — construcción local (sin GHCR).
-# Uso: clona el repo, copia .env.example a .env, ajusta variables y ejecuta:
+# PullPilot — local build (no GHCR).
+#
+# Quick start: mkdir -p /srv/docker-stacks, then:
 #   docker compose -f docker-compose-build.yml up -d --build
-# Misma configuración que docker-compose.yml salvo que la imagen se construye aquí.
+#
+# Optional .env next to this file overrides defaults (same variables as docker-compose.yml).
+#
 services:
   pullpilot:
     container_name: pullpilot
@@ -10,16 +13,28 @@ services:
       dockerfile: Dockerfile
     image: pullpilot:local
     restart: unless-stopped
-    env_file:
-      - .env
     ports:
       - "${PULLPILOT_PORT:-8000}:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - pullpilot_data:/app/data
-      - ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH}
+      - ${DOCKER_ROOT_PATH:-/srv/docker-stacks}:${DOCKER_ROOT_PATH:-/srv/docker-stacks}
     environment:
-      - TZ=${TZ}
+      TZ: ${TZ:-UTC}
+      DATA_DIR: ${DATA_DIR:-/app/data}
+      DOCKER_ROOT_PATH: ${DOCKER_ROOT_PATH:-/srv/docker-stacks}
+      PROJECTS_ROOT: ${PROJECTS_ROOT:-}
+      HEALTHCHECK_TIMEOUT: ${HEALTHCHECK_TIMEOUT:-60}
+      COMMAND_TIMEOUT: ${COMMAND_TIMEOUT:-300}
+      AUTH_USER: ${AUTH_USER:-}
+      AUTH_PASS: ${AUTH_PASS:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_HTTPS_ONLY: ${SESSION_HTTPS_ONLY:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      LOGIN_RATE_LIMIT_ENABLED: ${LOGIN_RATE_LIMIT_ENABLED:-true}
+      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-15}
+      LOGIN_RATE_LIMIT_WINDOW_SEC: ${LOGIN_RATE_LIMIT_WINDOW_SEC:-300}
+      TRUST_X_FORWARDED_FOR: ${TRUST_X_FORWARDED_FOR:-false}
 
 volumes:
   pullpilot_data:

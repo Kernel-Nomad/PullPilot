@@ -6,6 +6,10 @@ from server.config import COMMAND_TIMEOUT, logger
 
 
 def get_docker_compose_cmd() -> str:
+    """Prefer Docker Compose V2 (`docker compose`); fall back to legacy `docker-compose` binary.
+
+    The image Dockerfile installs the compose plugin; local dev or odd hosts may only have v1.
+    """
     try:
         subprocess.run(
             ["docker", "compose", "version"],
@@ -18,7 +22,7 @@ def get_docker_compose_cmd() -> str:
         return "docker-compose"
 
 
-# Resuelto una vez al importar el módulo (proceso uvicorn / tests).
+# Resolved once at import (uvicorn worker / tests).
 COMPOSE_CMD = get_docker_compose_cmd()
 
 
@@ -50,14 +54,16 @@ def run_command(
         )
         return result.stdout.strip()
     except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr or ""
         error_msg = (
             f"Timeout command: {cmd_display}\n"
             f"Timeout configurado: {COMMAND_TIMEOUT}s\n"
-            f"Stderr: {exc.stderr}"
+            f"Stderr: {stderr}"
         )
         logger.error(error_msg)
         raise RuntimeError(error_msg) from exc
     except subprocess.CalledProcessError as exc:
-        error_msg = f"Error command: {cmd_display}\nStderr: {exc.stderr}"
+        stderr = exc.stderr or ""
+        error_msg = f"Error command: {cmd_display}\nStderr: {stderr}"
         logger.error(error_msg)
         raise RuntimeError(error_msg) from exc

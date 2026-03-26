@@ -4,7 +4,7 @@ WORKDIR /app-web
 
 COPY web/package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY web/ ./
 RUN npm run build
@@ -26,7 +26,7 @@ RUN ARCH=$(uname -m) && \
         echo "Arquitectura no soportada: $ARCH" && exit 1; \
     fi && \
     mkdir -p /usr/local/lib/docker/cli-plugins && \
-    curl -SL "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-${items}" -o /usr/local/lib/docker/cli-plugins/docker-compose && \
+    curl -SL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-${items}" -o /usr/local/lib/docker/cli-plugins/docker-compose && \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose && \
     ln -s /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 

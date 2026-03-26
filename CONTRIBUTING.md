@@ -26,7 +26,8 @@ Relevant environment variables (adjust paths for your machine):
 
 | Variable | Description |
 |----------|-------------|
-| `PROJECTS_ROOT` | Directory whose subfolders contain `docker-compose.yml` (container default: `/app/projects`). |
+| `DOCKER_ROOT_PATH` | In Docker Compose installs, the stacks root on host and container (same absolute path as the bind mount). Optional in `.env`: the official compose defaults to `/srv/docker-stacks`. |
+| `PROJECTS_ROOT` | Advanced override: directory inside the container whose subfolders contain `docker-compose.yml` (defaults from `DOCKER_ROOT_PATH` or `/srv/docker-stacks`). |
 | `DATA_DIR` | SQLite and runtime data (container default: `/app/data`). Locally, often a folder in the repo such as `./data`. |
 | `AUTH_USER` / `AUTH_PASS` | Optional UI credentials. |
 | `SESSION_SECRET` | Session cookie signing key; set a fixed value in dev so sessions survive restarts. |
@@ -59,7 +60,15 @@ In development, Vite **proxies** `/api` (and related auth routes) to `http://loc
 make lint
 ```
 
-Runs `python -m compileall server` and `npm run build` in `web/`.
+Invokes Ruff on `server/` and `tests/`, byte-compiles `server/` using the Make variable `PY` (defaults to `python`), then runs `npm run lint` and `npm run build` in `web/`.
+
+### Tests
+
+```bash
+make test
+```
+
+Runs `pytest` via `PY -m pytest tests/`. Activate a Python 3.11+ venv first so `python` resolves correctly. On macOS, if the system `python3` is older than 3.11, run e.g. `PY=python3.11 make test`.
 
 ### Docker image
 

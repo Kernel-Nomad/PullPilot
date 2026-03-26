@@ -1,6 +1,5 @@
 import datetime
 import json
-import os
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,16 +20,24 @@ def _dir_has_compose_file(path: Path) -> bool:
     return (path / "docker-compose.yml").exists() or (path / "docker-compose.yaml").exists()
 
 
+def compose_project_path_ok(path: Path) -> bool:
+    """Directorio existente con docker-compose.yml o .yaml (mismo criterio que el escaneo)."""
+    return path.is_dir() and _dir_has_compose_file(path)
+
+
+def _compose_ps_q_ids(project_path: str, *, log_exec: bool) -> list[str]:
+    """Container IDs from `docker compose ps -q` (non-empty lines only)."""
+    out = run_command(f"{COMPOSE_CMD} ps -q", cwd=project_path, log_exec=log_exec)
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
 def _compose_ps_status(path_str: str) -> tuple[str, int]:
     try:
-        output = run_command(
-            f"{COMPOSE_CMD} ps -q", cwd=path_str, log_exec=False
-        )
-        running_count = len(output.splitlines()) if output else 0
-        status = "running" if running_count > 0 else "stopped"
+        ids = _compose_ps_q_ids(path_str, log_exec=False)
     except Exception:
-        status = "error"
-        running_count = 0
+        return "error", 0
+    running_count = len(ids)
+    status = "running" if running_count > 0 else "stopped"
     return status, running_count
 
 
@@ -47,8 +54,7 @@ def _wait_for_compose_healthy(
             )
 
         try:
-            ids_out = run_command(f"{COMPOSE_CMD} ps -q", cwd=project_path)
-            container_ids = ids_out.split()
+            container_ids = _compose_ps_q_ids(project_path, log_exec=True)
         except Exception:
             container_ids = []
 
@@ -105,15 +111,12 @@ def scan_projects_logic(db: Session) -> list[dict]:
     pending_db_write = False
     ordered: list[tuple[str, Path, ProjectSettings]] = []
 
-    for entry in os.listdir(PROJECTS_ROOT):
+    for path in PROJECTS_ROOT.iterdir():
+        entry = path.name
         if entry.lower() in IGNORED_PROJECT_NAMES:
             continue
 
-        path = PROJECTS_ROOT / entry
-        if not path.is_dir():
-            continue
-
-        if not _dir_has_compose_file(path):
+        if not compose_project_path_ok(path):
             continue
 
         proj = db.query(ProjectSettings).filter(ProjectSettings.name == entry).first()
@@ -180,7 +183,7 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
     log(f"=== ACTUALIZANDO: {name} ===")
 
     git_hash_before: str | None = None
-    is_git_repo = os.path.isdir(os.path.join(project.path, ".git"))
+    is_git_repo = (Path(project.path) / ".git").is_dir()
 
     if is_git_repo:
         try:

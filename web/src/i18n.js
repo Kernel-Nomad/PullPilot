@@ -32,13 +32,13 @@ const resources = {
         starting: "Iniciando...",
         empty_projects_title: "No hay proyectos detectados",
         empty_projects_intro:
-          "Si acabas de instalar PullPilot con Docker Compose, revisa la configuracion del servidor:",
+          "Lista de comprobación Docker Compose (si no ves proyectos):",
         empty_projects_path:
-          "La variable DOCKER_ROOT_PATH en tu .env debe apuntar a una carpeta que exista en el host (creala antes del primer arranque) y este montada en el contenedor con la misma ruta absoluta.",
+          "1) La carpeta de stacks debe existir en el host. Por defecto el compose usa /srv/docker-stacks; con .env opcional define DOCKER_ROOT_PATH si usas otra ruta.",
         empty_projects_compose:
-          "Dentro de esa carpeta, cada proyecto debe ser una subcarpeta que contenga docker-compose.yml o docker-compose.yaml.",
+          "2) Cada proyecto es una subcarpeta con docker-compose.yml o docker-compose.yaml.",
         empty_projects_volume:
-          "El servicio en docker-compose.yml debe incluir el volumen ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH} (como en el archivo oficial). Tras cambiar .env, reinicia el contenedor (docker compose up -d o restart).",
+          "3) El compose oficial monta esa ruta en host y contenedor (${DOCKER_ROOT_PATH:-/srv/docker-stacks}). Tras cambiar .env: docker compose up -d o restart.",
       },
       card: {
         containers: "Contenedores",
@@ -144,13 +144,13 @@ const resources = {
         starting: "Starting...",
         empty_projects_title: "No projects detected",
         empty_projects_intro:
-          "If you just installed PullPilot with Docker Compose, check the following:",
+          "Docker Compose checklist (if the list is empty):",
         empty_projects_path:
-          "DOCKER_ROOT_PATH in your .env must point to a folder that exists on the host (create it before the first start) and is bind-mounted into the container at the same absolute path.",
+          "1) The stacks folder must exist on the host. The default compose path is /srv/docker-stacks; add an optional .env with DOCKER_ROOT_PATH if you use another path.",
         empty_projects_compose:
-          "Under that folder, each project should be a subfolder containing docker-compose.yml or docker-compose.yaml.",
+          "2) Each project is a subfolder with docker-compose.yml or docker-compose.yaml.",
         empty_projects_volume:
-          "The compose service must include the volume ${DOCKER_ROOT_PATH}:${DOCKER_ROOT_PATH} (as in the official file). After changing .env, restart the container (docker compose up -d or restart).",
+          "3) The official compose bind-mounts that path on host and container (${DOCKER_ROOT_PATH:-/srv/docker-stacks}). After .env changes: docker compose up -d or restart.",
       },
       card: {
         containers: "Containers",

@@ -1,5 +1,6 @@
-from threading import Lock
 import time
+from pathlib import Path
+from threading import Lock
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -9,7 +10,7 @@ from server.config import logger
 from server.database import SessionLocal
 from server.models.db import ProjectSettings, ScheduledTask
 from server.services.docker import run_command
-from server.services.projects import update_single_project_logic
+from server.services.projects import compose_project_path_ok, update_single_project_logic
 from server.services.update_logs import persist_update_log
 
 
@@ -39,6 +40,8 @@ def snapshot_global_update_status() -> dict[str, object]:
         "current_project": s["current_project"],
         "processed": processed_copy,
     }
+
+
 global_update_lock = Lock()
 
 
@@ -82,7 +85,8 @@ def global_update_job() -> None:
     try:
         logger.info("Iniciando tarea programada: Actualizacion Global Segura")
 
-        projects = db.query(ProjectSettings).filter(ProjectSettings.excluded.is_(False)).all()
+        rows = db.query(ProjectSettings).filter(ProjectSettings.excluded.is_(False)).all()
+        projects = [p for p in rows if compose_project_path_ok(Path(p.path))]
         global_update_status["total"] = len(projects)
         global_update_status["current"] = 0
 
@@ -158,6 +162,13 @@ def job_wrapper(target: str) -> None:
     db = SessionLocal()
     try:
         logger.info("Ejecutando tarea programada: %s", target)
+        project = db.query(ProjectSettings).filter(ProjectSettings.name == target).first()
+        if not project or not compose_project_path_ok(Path(project.path)):
+            logger.warning(
+                "Omitiendo tarea programada %s: no existe en BD o la ruta no es un stack compose valido.",
+                target,
+            )
+            return
         success, logs = update_single_project_logic(target, db)
 
         summary = f"[Scheduled] {target}: {'OK' if success else 'ERROR'}"

@@ -11,6 +11,7 @@ from server.config import (
     AUTH_PASS,
     AUTH_USER,
     CORS_ORIGINS,
+    DEFAULT_STACKS_ROOT,
     PROJECTS_ROOT,
     SESSION_HTTPS_ONLY,
     SESSION_SECRET,
@@ -25,15 +26,30 @@ from server.routers.schedules import router as schedules_router
 from server.routers.status import router as status_router
 from server.services.scheduler import start_scheduler, stop_scheduler
 
+AUTH_PUBLIC_PATHS = frozenset({"/login", "/logout"})
+AUTH_PUBLIC_PATH_EXTENSIONS = (
+    ".png",
+    ".ico",
+    ".js",
+    ".css",
+    ".svg",
+    ".json",
+    ".webmanifest",
+)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     if not PROJECTS_ROOT.exists():
         logger.warning(
-            "PROJECTS_ROOT no existe (%s). Revisa DOCKER_ROOT_PATH y el volumen bind en "
-            "docker-compose; la lista de proyectos estará vacía hasta que la ruta exista.",
+            "La carpeta de stacks no existe: %s. Por defecto el compose oficial usa "
+            "/srv/docker-stacks (${DOCKER_ROOT_PATH:-%s}); en .env puedes definir "
+            "DOCKER_ROOT_PATH u override avanzado PROJECTS_ROOT. Créala en el host y "
+            "revisa el bind mount en docker-compose; hasta entonces la lista de proyectos "
+            "estará vacía.",
             PROJECTS_ROOT,
+            DEFAULT_STACKS_ROOT,
         )
     start_scheduler()
     yield
@@ -53,20 +69,10 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     path = request.url.path
-    public_paths = {"/login", "/logout"}
-    public_extensions = (
-        ".png",
-        ".ico",
-        ".js",
-        ".css",
-        ".svg",
-        ".json",
-        ".webmanifest",
-    )
 
     if (
-        path in public_paths
-        or path.endswith(public_extensions)
+        path in AUTH_PUBLIC_PATHS
+        or path.endswith(AUTH_PUBLIC_PATH_EXTENSIONS)
         or path.startswith("/assets/")
     ):
         return await call_next(request)

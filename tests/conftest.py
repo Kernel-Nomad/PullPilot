@@ -4,6 +4,7 @@ import tempfile
 os.environ["PULLPILOT_TESTING"] = "1"
 os.environ["AUTH_USER"] = ""
 os.environ["AUTH_PASS"] = ""
+os.environ.setdefault("SESSION_SECRET", "pullpilot-test-session-secret")
 if "DATA_DIR" not in os.environ:
     os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="pullpilot_test_")
 
