@@ -18,10 +18,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - name: Install project and pip-audit
+      - name: Install project
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pip-audit
           python -m pip install .
+      - name: Capture dependency pins for audit
+        run: python -m pip freeze | grep -v -E '^pullpilot(==| @)' > /tmp/audit-req.txt
+      - name: Install pip-audit
+        run: python -m pip install pip-audit
       - name: Audit dependencies
-        run: pip-audit
+        run: pip-audit -r /tmp/audit-req.txt
