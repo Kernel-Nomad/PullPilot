@@ -6,7 +6,7 @@ PY ?= python
 .PHONY: dev-server dev-web build up lint test
 
 dev-server:
-	uvicorn server.app:app --reload
+	ALLOW_NO_AUTH=true uvicorn server.app:app --reload
 
 dev-web:
 	cd web && npm run dev

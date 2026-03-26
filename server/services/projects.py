@@ -16,6 +16,37 @@ from server.services.docker import COMPOSE_CMD, run_command
 IGNORED_PROJECT_NAMES = {"pullpilot", "pullpilot-ui", "docker-updater", "data"}
 
 
+def _resolved_projects_root() -> Path:
+    return PROJECTS_ROOT.resolve()
+
+
+def resolve_allowed_project_workdir(raw: str) -> Path:
+    """Resuelve la ruta del stack y comprueba que quede bajo PROJECTS_ROOT."""
+    root = _resolved_projects_root()
+    candidate = Path(raw).expanduser()
+    try:
+        resolved = candidate.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"No se pudo resolver la ruta del proyecto: {exc}") from exc
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise ValueError(
+            "La ruta del proyecto no está bajo PROJECTS_ROOT (posible dato alterado en BD)."
+        ) from None
+    return resolved
+
+
+def compose_stack_allowed(path: Path) -> bool:
+    """True si el directorio es un stack compose válido y está bajo PROJECTS_ROOT."""
+    try:
+        resolved = path.expanduser().resolve()
+        resolved.relative_to(_resolved_projects_root())
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return compose_project_path_ok(resolved)
+
+
 def _dir_has_compose_file(path: Path) -> bool:
     return (path / "docker-compose.yml").exists() or (path / "docker-compose.yaml").exists()
 
@@ -182,12 +213,22 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
 
     log(f"=== ACTUALIZANDO: {name} ===")
 
+    try:
+        workdir = resolve_allowed_project_workdir(project.path)
+    except ValueError as exc:
+        return False, [f"ERROR: {exc}"]
+
+    if not compose_project_path_ok(workdir):
+        return False, ["ERROR: El directorio del proyecto no es un stack compose válido."]
+
+    workdir_str = str(workdir)
+
     git_hash_before: str | None = None
-    is_git_repo = (Path(project.path) / ".git").is_dir()
+    is_git_repo = (workdir / ".git").is_dir()
 
     if is_git_repo:
         try:
-            git_hash_before = run_command("git rev-parse HEAD", cwd=project.path)
+            git_hash_before = run_command("git rev-parse HEAD", cwd=workdir_str)
             log(f"Snapshot creado. Commit actual: {git_hash_before[:7]}")
         except Exception as exc:
             log(f"No se pudo guardar estado Git: {exc}", "WARN")
@@ -195,23 +236,23 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
     try:
         if is_git_repo:
             log("Ejecutando git pull...")
-            run_command("git pull", cwd=project.path)
+            run_command("git pull", cwd=workdir_str)
 
         log("Descargando imagenes nuevas...")
-        run_command(f"{COMPOSE_CMD} pull", cwd=project.path)
+        run_command(f"{COMPOSE_CMD} pull", cwd=workdir_str)
 
         if project.full_stop:
             log("Modo Full Stop: bajando servicios...")
-            run_command(f"{COMPOSE_CMD} down", cwd=project.path)
+            run_command(f"{COMPOSE_CMD} down", cwd=workdir_str)
         else:
             log("Deteniendo contenedores...")
-            run_command(f"{COMPOSE_CMD} stop", cwd=project.path)
+            run_command(f"{COMPOSE_CMD} stop", cwd=workdir_str)
 
         log("Recreando contenedores...")
-        run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
+        run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=workdir_str)
 
         log(f"Verificando salud (timeout: {HEALTHCHECK_TIMEOUT}s)...")
-        _wait_for_compose_healthy(project.path, log)
+        _wait_for_compose_healthy(workdir_str, log)
 
         logs.append("=== PROCESO COMPLETADO CORRECTAMENTE ===")
         return True, logs
@@ -221,11 +262,11 @@ def update_single_project_logic(name: str, db: Session) -> tuple[bool, list[str]
         if git_hash_before:
             log("INICIANDO ROLLBACK AUTOMATICO...", "WARN")
             try:
-                run_command(["git", "reset", "--hard", git_hash_before], cwd=project.path)
+                run_command(["git", "reset", "--hard", git_hash_before], cwd=workdir_str)
                 log(f"Codigo revertido a commit {git_hash_before[:7]}.")
 
                 log("Forzando redespliegue de version anterior...")
-                run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=project.path)
+                run_command(f"{COMPOSE_CMD} up -d --build --remove-orphans", cwd=workdir_str)
                 log("Rollback exitoso. El sistema ha vuelto al estado previo.", "SUCCESS")
                 logs.append(
                     "NOTA: Se ha realizado un rollback automatico para restaurar el servicio."

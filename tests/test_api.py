@@ -188,3 +188,81 @@ def test_scan_syncs_stored_project_path(
         assert row.path == str(proj_dir)
     finally:
         db.close()
+
+
+def test_update_rejects_project_path_outside_projects_root(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    root = tmp_path / "stacks"
+    proj_dir = root / "myapp"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    monkeypatch.setattr(projects_module, "PROJECTS_ROOT", root)
+
+    def _fake_run_command(*_args, **_kwargs):
+        return ""
+
+    monkeypatch.setattr(projects_module, "run_command", _fake_run_command)
+
+    assert client.get("/api/projects").status_code == 200
+    db = SessionLocal()
+    try:
+        row = db.query(ProjectSettings).filter(ProjectSettings.name == "myapp").first()
+        assert row is not None
+        row.path = str(outside)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post("/api/projects/myapp/update")
+    assert response.status_code == 500
+    detail = response.json().get("detail", "")
+    assert "La actualización falló" in detail
+    assert "PROJECTS_ROOT" not in detail
+
+
+def test_update_project_failure_hides_internal_logs_in_http_detail(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _fake_update(_name, _db):
+        return False, ["INTERNAL_DOCKER_STDERR_SECRET"]
+
+    monkeypatch.setattr(projects_module, "update_single_project_logic", _fake_update)
+
+    response = client.post("/api/projects/anything/update")
+    assert response.status_code == 500
+    assert "INTERNAL_DOCKER" not in response.text
+
+
+def test_validate_startup_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.config as cfg
+
+    monkeypatch.setattr(cfg, "ALLOW_NO_AUTH", False)
+    monkeypatch.setattr(cfg, "AUTH_USER", None)
+    monkeypatch.setattr(cfg, "AUTH_PASS", None)
+    monkeypatch.delenv("UVICORN_WORKERS", raising=False)
+    with pytest.raises(RuntimeError, match="AUTH_USER"):
+        cfg.validate_startup_security()
+
+
+def test_validate_startup_allows_explicit_no_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.config as cfg
+
+    monkeypatch.setattr(cfg, "ALLOW_NO_AUTH", True)
+    monkeypatch.setattr(cfg, "AUTH_USER", None)
+    monkeypatch.setattr(cfg, "AUTH_PASS", None)
+    monkeypatch.delenv("UVICORN_WORKERS", raising=False)
+    cfg.validate_startup_security()
+
+
+def test_validate_startup_workers_require_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.config as cfg
+
+    monkeypatch.setenv("UVICORN_WORKERS", "2")
+    monkeypatch.setattr(cfg, "_SESSION_SECRET_SET", False)
+    monkeypatch.setattr(cfg, "ALLOW_NO_AUTH", True)
+    with pytest.raises(RuntimeError, match="SESSION_SECRET"):
+        cfg.validate_startup_security()

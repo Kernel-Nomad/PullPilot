@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from server.config import logger
 from server.database import session_scope
 from server.models.db import ProjectSettings
 from server.models.schemas import Project
@@ -63,7 +64,11 @@ async def update_project(name: str):
             ) from None
 
         if not success:
-            raise HTTPException(status_code=500, detail="\n".join(logs))
+            logger.error("Actualización fallida para %s:\n%s", name, "\n".join(logs))
+            raise HTTPException(
+                status_code=500,
+                detail="La actualización falló. Consulta el historial en la UI o los logs del servidor.",
+            )
 
         return {"success": success, "logs": logs}
 

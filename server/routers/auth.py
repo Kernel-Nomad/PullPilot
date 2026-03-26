@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -43,7 +45,18 @@ async def login(
     if AUTH_USER and AUTH_PASS and is_login_rate_limited(ip):
         return RedirectResponse(url="/login?ratelimit=1", status_code=status.HTTP_303_SEE_OTHER)
 
-    if username == AUTH_USER and password == AUTH_PASS:
+    if not AUTH_USER or not AUTH_PASS:
+        return RedirectResponse(url="/login?error=1", status_code=status.HTTP_303_SEE_OTHER)
+
+    user_ok = hmac.compare_digest(
+        username.encode("utf-8"),
+        AUTH_USER.encode("utf-8"),
+    )
+    pass_ok = hmac.compare_digest(
+        password.encode("utf-8"),
+        AUTH_PASS.encode("utf-8"),
+    )
+    if user_ok and pass_ok:
         if AUTH_USER and AUTH_PASS:
             clear_login_failures(ip)
         request.session["user"] = username

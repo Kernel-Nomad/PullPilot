@@ -14,9 +14,11 @@ from server.config import (
     DEFAULT_STACKS_ROOT,
     PROJECTS_ROOT,
     SESSION_HTTPS_ONLY,
+    SESSION_SAME_SITE,
     SESSION_SECRET,
     STATIC_DIR,
     logger,
+    validate_startup_security,
 )
 from server.database import Base, engine
 from server.models import db as _db_models  # noqa: F401
@@ -40,6 +42,7 @@ AUTH_PUBLIC_PATH_EXTENSIONS = (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    validate_startup_security()
     Base.metadata.create_all(bind=engine)
     if not PROJECTS_ROOT.exists():
         logger.warning(
@@ -93,6 +96,7 @@ app.add_middleware(
     secret_key=SESSION_SECRET,
     max_age=2592000,
     session_cookie="pullpilot_session",
+    same_site=SESSION_SAME_SITE,
     https_only=SESSION_HTTPS_ONLY,
 )
 

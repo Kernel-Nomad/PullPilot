@@ -10,7 +10,7 @@ from server.config import logger
 from server.database import SessionLocal
 from server.models.db import ProjectSettings, ScheduledTask
 from server.services.docker import run_command
-from server.services.projects import compose_project_path_ok, update_single_project_logic
+from server.services.projects import compose_stack_allowed, update_single_project_logic
 from server.services.update_logs import persist_update_log
 
 
@@ -86,7 +86,7 @@ def global_update_job() -> None:
         logger.info("Iniciando tarea programada: Actualizacion Global Segura")
 
         rows = db.query(ProjectSettings).filter(ProjectSettings.excluded.is_(False)).all()
-        projects = [p for p in rows if compose_project_path_ok(Path(p.path))]
+        projects = [p for p in rows if compose_stack_allowed(Path(p.path))]
         global_update_status["total"] = len(projects)
         global_update_status["current"] = 0
 
@@ -163,7 +163,7 @@ def job_wrapper(target: str) -> None:
     try:
         logger.info("Ejecutando tarea programada: %s", target)
         project = db.query(ProjectSettings).filter(ProjectSettings.name == target).first()
-        if not project or not compose_project_path_ok(Path(project.path)):
+        if not project or not compose_stack_allowed(Path(project.path)):
             logger.warning(
                 "Omitiendo tarea programada %s: no existe en BD o la ruta no es un stack compose valido.",
                 target,

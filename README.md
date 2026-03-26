@@ -59,7 +59,7 @@ docker compose up -d
 
 Open **http://your-server-ip:8000** (or the host port from `PULLPILOT_PORT` in `.env`).
 
-No `.env` is required if you use the default stacks path **`/srv/docker-stacks`**. Optional: copy [`.env.example`](https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example) to `.env`. Beyond a trusted LAN, set **`AUTH_USER`**, **`AUTH_PASS`**, and a fixed **`SESSION_SECRET`** (see [Environment variables (reference)](#environment-variables-reference)).
+No `.env` is required if you use the default stacks path **`/srv/docker-stacks`**. The official `docker-compose.yml` sets **`ALLOW_NO_AUTH=true`** by default so the quick start works without login on a trusted LAN. For anything reachable beyond that, set **`ALLOW_NO_AUTH=false`**, define **`AUTH_USER`** and **`AUTH_PASS`**, and a fixed **`SESSION_SECRET`** (see [Environment variables (reference)](#environment-variables-reference)). Local `make dev-server` also sets `ALLOW_NO_AUTH=true` for convenience.
 
 ## After startup
 
@@ -95,10 +95,12 @@ Day-to-day: `make dev-server`, `make dev-web` (see [`Makefile`](./Makefile)).
 
 ## Important notes
 
-- **Docker socket:** treat PullPilot like root access; do not expose port 8000 to the internet without a reverse proxy and extra auth (Authelia, Authentik, etc.).
-- **Single worker:** one Uvicorn worker per instance (scheduler and login rate limit are in-memory).
-- **Auth:** login is enabled only when **both** `AUTH_USER` and `AUTH_PASS` are set.
+- **Docker socket:** treat PullPilot like root access; do not expose port 8000 to the public internet without TLS (reverse proxy), **`ALLOW_NO_AUTH=false`**, strong **`AUTH_USER` / `AUTH_PASS`**, and ideally an extra auth layer (Authelia, Authentik, etc.).
+- **Stack paths:** updates and scheduled jobs only run under **`PROJECTS_ROOT`** (resolved); database paths outside that tree are rejected.
+- **Single worker:** one Uvicorn worker per instance (scheduler and login rate limit are in-memory). If you ever run **`UVICORN_WORKERS` > 1**, you **must** set **`SESSION_SECRET`** so all workers share the same signing key.
+- **Auth:** with **`ALLOW_NO_AUTH=false`** (default when not using the official compose defaults), the app **refuses to start** until **both** `AUTH_USER` and `AUTH_PASS` are set. With **`ALLOW_NO_AUTH=true`**, the API is open unless you also set credentials (middleware then enforces login when both are set).
 - **SESSION_SECRET:** unset ⇒ new secret each restart ⇒ sessions reset; set a long random value in production (`openssl rand -hex 32`).
+- **HTTPS / cookies:** behind a TLS-terminating proxy, set **`SESSION_HTTPS_ONLY=true`**. **`SESSION_SAME_SITE`** defaults to `lax` (Starlette); use `strict` for stricter same-site behaviour, or `none` only with HTTPS and cross-site requirements (browsers require `Secure`).
 - **PROJECTS_ROOT:** use only if the path *inside* the container must differ from the bind mount; otherwise use `DOCKER_ROOT_PATH`.
 - **Proxy:** `TRUST_X_FORWARDED_FOR=true` only behind a proxy you trust (affects login rate-limit IP).
 
@@ -116,9 +118,11 @@ Single list for Compose `.env` and runtime. Details also in [`.env.example`](./.
 | `PULLPILOT_PORT` | `8000` | Published host port for the UI. |
 | `TZ` | `UTC` | Container timezone. |
 | `DATA_DIR` | `/app/data` | SQLite and runtime data (official compose uses volume `pullpilot_data`). |
-| `AUTH_USER` / `AUTH_PASS` | (unset) | **Both** required to enable login. |
-| `SESSION_SECRET` | (generated) | Fixed value ⇒ sessions survive restarts. |
+| `ALLOW_NO_AUTH` | `false`* | *Official compose defaults to `true` via substitution. If `false`, **`AUTH_USER`** and **`AUTH_PASS`** are required or startup fails. |
+| `AUTH_USER` / `AUTH_PASS` | (unset) | Required when `ALLOW_NO_AUTH=false`. If both set, session login is enforced by middleware. |
+| `SESSION_SECRET` | (generated) | Fixed value ⇒ sessions survive restarts. **Required** if `UVICORN_WORKERS` > 1. |
 | `SESSION_HTTPS_ONLY` | `false` | Set `true` if the app is only served over HTTPS. |
+| `SESSION_SAME_SITE` | `lax` | Cookie SameSite: `lax`, `strict`, or `none` (use `none` only with HTTPS). |
 | `CORS_ORIGINS` | (empty) | Comma-separated origins; empty often OK when the SPA is served by the same app. |
 | `HEALTHCHECK_TIMEOUT` | `60` | Post-deploy health wait (seconds). |
 | `COMMAND_TIMEOUT` | `300` | External command timeout (seconds). |
@@ -130,7 +134,12 @@ Single list for Compose `.env` and runtime. Details also in [`.env.example`](./.
 ### Advanced (copy into `.env` as needed)
 
 ```bash
+# Production-style (example)
+# ALLOW_NO_AUTH=false
+# AUTH_USER=admin
+# AUTH_PASS=your-secure-password
 SESSION_HTTPS_ONLY=true
+# SESSION_SAME_SITE=strict
 # CORS_ORIGINS=https://pullpilot.example.com
 # LOGIN_RATE_LIMIT_ENABLED=true
 # LOGIN_RATE_LIMIT_MAX=15
@@ -160,7 +169,7 @@ docker compose up -d
 
 Abre **http://tu-servidor-ip:8000** (o el puerto del host definido en `PULLPILOT_PORT` en `.env`).
 
-No hace falta `.env` si usas la ruta por defecto **`/srv/docker-stacks`**. Opcional: copia [`.env.example`](https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example) a `.env`. Fuera de una LAN de confianza, configura **`AUTH_USER`**, **`AUTH_PASS`** y **`SESSION_SECRET`** fijo (tabla única en [Environment variables (reference)](#environment-variables-reference)).
+No hace falta `.env` si usas la ruta por defecto **`/srv/docker-stacks`**. El `docker-compose.yml` oficial define **`ALLOW_NO_AUTH=true`** por defecto para el inicio rápido sin login en una LAN de confianza. Si la instancia es accesible más allá de eso, pon **`ALLOW_NO_AUTH=false`**, **`AUTH_USER`**, **`AUTH_PASS`** y un **`SESSION_SECRET`** fijo (tabla en [Environment variables (reference)](#environment-variables-reference)). `make dev-server` también usa `ALLOW_NO_AUTH=true` por comodidad.
 
 ## Después del arranque
 
@@ -196,10 +205,12 @@ Día a día: `make dev-server`, `make dev-web` (ver [`Makefile`](./Makefile)).
 
 ## Notas importantes
 
-- **Socket Docker:** trata PullPilot como acceso privilegiado; no expongas el puerto 8000 a internet sin proxy inverso y capa de auth adicional.
-- **Un solo worker:** un proceso Uvicorn por instancia (scheduler y rate limit de login en memoria).
-- **Autenticación:** el login solo se activa con **los dos**, `AUTH_USER` y `AUTH_PASS`.
+- **Socket Docker:** trata PullPilot como acceso privilegiado; no expongas el puerto 8000 a internet pública sin TLS (proxy inverso), **`ALLOW_NO_AUTH=false`**, **`AUTH_USER` / `AUTH_PASS`** fuertes y, si puedes, otra capa de auth (Authelia, Authentik, etc.).
+- **Rutas de stacks:** las actualizaciones y tareas programadas solo usan directorios bajo **`PROJECTS_ROOT`** (resuelto); rutas en BD fuera de ese árbol se rechazan.
+- **Un solo worker:** un proceso Uvicorn por instancia (scheduler y rate limit en memoria). Si usas **`UVICORN_WORKERS` > 1**, debes definir **`SESSION_SECRET`** para que todas las firmas de sesión coincidan.
+- **Autenticación:** con **`ALLOW_NO_AUTH=false`** (valor por defecto fuera del compose oficial), la app **no arranca** sin **`AUTH_USER`** y **`AUTH_PASS`**. Con **`ALLOW_NO_AUTH=true`**, la API queda abierta salvo que también definas credenciales (entonces el middleware exige sesión).
 - **SESSION_SECRET:** sin definir, cada reinicio invalida sesiones; en producción usa un valor aleatorio largo (`openssl rand -hex 32`).
+- **HTTPS / cookies:** tras un proxy con TLS, **`SESSION_HTTPS_ONLY=true`**. **`SESSION_SAME_SITE`** por defecto `lax`; `strict` endurece same-site; `none` solo con HTTPS y necesidad cross-site (el navegador exige `Secure`).
 - **PROJECTS_ROOT:** solo si la ruta *dentro* del contenedor debe diferir del bind mount; si no, usa `DOCKER_ROOT_PATH`.
 - **Proxy:** `TRUST_X_FORWARDED_FOR=true` solo detrás de un proxy de confianza (afecta la IP del rate limit de login).
 
