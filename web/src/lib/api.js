@@ -1,6 +1,15 @@
 export const API_URL = "/api";
 export const SESSION_EXPIRED_ERROR = "Sesión expirada";
 
+/** Normaliza a es | en (alineado con el backend). */
+export function normalizeUiLocale(lang) {
+  if (lang == null || typeof lang !== "string") {
+    return "es";
+  }
+  const base = lang.split("-")[0].toLowerCase();
+  return base === "en" ? "en" : "es";
+}
+
 export function isBackendUnreachableError(error) {
   if (!error) {
     return false;
@@ -27,7 +36,11 @@ export async function handleAuthError(response, options = {}) {
 }
 
 async function request(path, options = {}, context = {}) {
-  const response = await fetch(`${API_URL}${path}`, options);
+  const headers = new Headers(options.headers ?? undefined);
+  if (context.locale) {
+    headers.set("Accept-Language", context.locale);
+  }
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   await handleAuthError(response, context);
   return response;
 }

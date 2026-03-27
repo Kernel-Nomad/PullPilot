@@ -3,6 +3,7 @@ import subprocess
 from collections.abc import Sequence
 
 from server.config import COMMAND_TIMEOUT, logger
+from server.locale.log_messages import t
 
 
 def get_docker_compose_cmd() -> str:
@@ -31,6 +32,7 @@ def run_command(
     cwd: str | None = None,
     *,
     log_exec: bool = True,
+    locale: str = "es",
 ) -> str:
     if isinstance(cmd, str):
         cmd_args = shlex.split(cmd)
@@ -56,14 +58,17 @@ def run_command(
     except subprocess.TimeoutExpired as exc:
         stderr = exc.stderr or ""
         error_msg = (
-            f"Timeout command: {cmd_display}\n"
-            f"Timeout configurado: {COMMAND_TIMEOUT}s\n"
-            f"Stderr: {stderr}"
+            f"{t('docker.timeout_command', locale, cmd=cmd_display)}\n"
+            f"{t('docker.timeout_configured', locale, seconds=COMMAND_TIMEOUT)}\n"
+            f"{t('docker.stderr_label', locale)} {stderr}"
         )
         logger.error(error_msg)
         raise RuntimeError(error_msg) from exc
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr or ""
-        error_msg = f"Error command: {cmd_display}\nStderr: {stderr}"
+        error_msg = (
+            f"{t('docker.error_command', locale, cmd=cmd_display)}\n"
+            f"{t('docker.stderr_label', locale)} {stderr}"
+        )
         logger.error(error_msg)
         raise RuntimeError(error_msg) from exc

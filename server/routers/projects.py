@@ -1,11 +1,13 @@
 from typing import Callable, List, Literal, TypeVar
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from server.config import logger
+from server.locale.http import get_request_locale
+from server.locale.log_messages import t
 from server.database import session_scope
 from server.models.db import ProjectSettings
 from server.models.schemas import Project
@@ -46,11 +48,14 @@ async def get_projects():
 
 
 @router.post("/projects/{name}/update")
-async def update_project(name: str):
+async def update_project(name: str, locale: str = Depends(get_request_locale)):
     def work(db: Session):
-        success, logs = update_single_project_logic(name, db)
+        success, logs = update_single_project_logic(name, db, locale=locale)
 
-        summary = f"{name}: {'OK' if success else 'ERROR'}"
+        status_word = (
+            t("log.status_ok", locale) if success else t("log.status_error", locale)
+        )
+        summary = t("summary.project", locale, name=name, status=status_word)
         try:
             persist_update_log(
                 db,
@@ -60,14 +65,14 @@ async def update_project(name: str):
             )
         except SQLAlchemyError:
             raise HTTPException(
-                status_code=500, detail="Error al guardar el historial"
+                status_code=500, detail=t("http.history_save_failed", locale)
             ) from None
 
         if not success:
             logger.error("Actualización fallida para %s:\n%s", name, "\n".join(logs))
             raise HTTPException(
                 status_code=500,
-                detail="La actualización falló. Consulta el historial en la UI o los logs del servidor.",
+                detail=t("http.update_failed", locale),
             )
 
         return {"success": success, "logs": logs}

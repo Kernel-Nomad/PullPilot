@@ -2,6 +2,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from server.database import get_db
+from server.locale.http import get_request_locale
+from server.locale.log_messages import t
 from server.models.db import UpdateLog
 from server.models.schemas import UpdateLogOut
 from server.services.scheduler import global_update_job, snapshot_global_update_status
@@ -11,9 +13,12 @@ router = APIRouter(prefix="/api", tags=["status"])
 
 
 @router.post("/update-all")
-def trigger_update_all(background_tasks: BackgroundTasks):
-    background_tasks.add_task(global_update_job)
-    return {"message": "Actualizacion global iniciada en segundo plano"}
+def trigger_update_all(
+    background_tasks: BackgroundTasks,
+    locale: str = Depends(get_request_locale),
+):
+    background_tasks.add_task(global_update_job, locale)
+    return {"message": t("api.update_all_started", locale)}
 
 
 @router.get("/update-status")

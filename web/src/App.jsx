@@ -18,6 +18,7 @@ import {
   fetchUpdateStatus,
   isBackendUnreachableError,
   logout,
+  normalizeUiLocale,
   SESSION_EXPIRED_ERROR,
   toggleProjectSetting,
   triggerUpdateAll,
@@ -58,8 +59,9 @@ export default function App() {
   const requestContext = useMemo(
     () => ({
       onUnauthorized: handleUnauthorized,
+      locale: normalizeUiLocale(i18n.language),
     }),
-    [handleUnauthorized]
+    [handleUnauthorized, i18n.language]
   );
 
   const loadProjects = useCallback(async () => {

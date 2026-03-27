@@ -126,6 +126,7 @@ Single list for Compose `.env` and runtime. Details also in [`.env.example`](./.
 | `CORS_ORIGINS` | (empty) | Comma-separated origins; empty often OK when the SPA is served by the same app. |
 | `HEALTHCHECK_TIMEOUT` | `60` | Post-deploy health wait (seconds). |
 | `COMMAND_TIMEOUT` | `300` | External command timeout (seconds). |
+| `LOG_LOCALE` | `es` | Language for scheduled update logs and history entries (`es` or `en`). UI-triggered updates use `Accept-Language` instead. |
 | `LOGIN_RATE_LIMIT_ENABLED` | `true` | In-memory login rate limit per IP. |
 | `LOGIN_RATE_LIMIT_MAX` | `15` | Max attempts per window. |
 | `LOGIN_RATE_LIMIT_WINDOW_SEC` | `300` | Window length (seconds). |

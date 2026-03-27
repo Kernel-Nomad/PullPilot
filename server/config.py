@@ -26,6 +26,11 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 HEALTHCHECK_TIMEOUT = int(os.getenv("HEALTHCHECK_TIMEOUT", "60"))
 COMMAND_TIMEOUT = int(os.getenv("COMMAND_TIMEOUT", "300"))
 
+_raw_log_locale = (os.getenv("LOG_LOCALE") or "es").strip().lower()
+LOG_LOCALE: Literal["es", "en"] = (
+    _raw_log_locale if _raw_log_locale in ("es", "en") else "es"
+)
+
 AUTH_USER = os.getenv("AUTH_USER")
 AUTH_PASS = os.getenv("AUTH_PASS")
 # Si es false (por defecto), hace falta AUTH_USER y AUTH_PASS o el arranque falla.

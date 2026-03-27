@@ -6,8 +6,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
-from server.config import logger
+from server.config import LOG_LOCALE, logger
 from server.database import SessionLocal
+from server.locale.log_messages import t
 from server.models.db import ProjectSettings, ScheduledTask
 from server.services.docker import run_command
 from server.services.projects import compose_stack_allowed, update_single_project_logic
@@ -74,7 +75,9 @@ def build_trigger(task_type: str, expression: str) -> CronTrigger | DateTrigger:
     raise ValueError(f"Tipo de tarea no soportado: {task_type}")
 
 
-def global_update_job() -> None:
+def global_update_job(locale: str | None = None) -> None:
+    loc = locale if locale is not None else LOG_LOCALE
+
     if not global_update_lock.acquire(blocking=False):
         logger.warning("Actualizacion global ya en curso. Omitiendo tarea.")
         return
@@ -102,14 +105,21 @@ def global_update_job() -> None:
                 time.sleep(2)
 
             try:
-                success, logs = update_single_project_logic(project.name, db)
+                success, logs = update_single_project_logic(
+                    project.name, db, locale=loc
+                )
             except Exception as exc:
                 success = False
-                logs = [f"[ERR] Error interno en el bucle principal: {exc}"]
+                logs = [t("scheduler.internal_loop_error", loc, exc=exc)]
 
             global_logs[project.name] = logs
             global_update_status["processed"].append(
-                {"name": project.name, "status": "OK" if success else "ERROR"}
+                {
+                    "name": project.name,
+                    "status": t("log.status_ok", loc)
+                    if success
+                    else t("log.status_error", loc),
+                }
             )
 
             if success:
@@ -118,26 +128,27 @@ def global_update_job() -> None:
                 error_count += 1
 
         if error_count == 0:
-            global_update_status["current_project"] = "Limpiando sistema (safe prune)..."
+            global_update_status["current_project"] = t("scheduler.status_pruning", loc)
             try:
                 logger.info("Iniciando espera de seguridad de 5s antes del prune...")
                 time.sleep(5)
-                prune_out = run_command("docker image prune -f")
-                message = "Limpieza de imagenes obsoletas completada (safe mode)."
+                prune_out = run_command("docker image prune -f", locale=loc)
+                message = t("scheduler.safe_cleanup_done", loc)
                 if prune_out:
-                    message += f"\nOutput Docker:\n{prune_out}"
+                    message += f"\n{t('scheduler.docker_output', loc)}\n{prune_out}"
                 global_logs["safe_cleanup"] = message
             except Exception as exc:
-                global_logs["safe_cleanup"] = f"Error en limpieza de imagenes: {exc}"
+                global_logs["safe_cleanup"] = t(
+                    "scheduler.safe_cleanup_failed", loc, exc=exc
+                )
         else:
-            warning_msg = (
-                f"[WARN] LIMPIEZA OMITIDA: Se detectaron {error_count} errores durante la "
-                "actualizacion. No se ejecutara prune para facilitar la depuracion."
-            )
+            warning_msg = t("scheduler.cleanup_skipped", loc, errors=error_count)
             logger.warning(warning_msg)
             global_logs["safe_cleanup"] = warning_msg
 
-        summary = f"Global Update: {success_count} OK, {error_count} Errores"
+        summary = t(
+            "scheduler.global_summary", loc, ok=success_count, errors=error_count
+        )
         status = "SUCCESS" if error_count == 0 else "ERROR"
 
         persist_update_log(
@@ -159,6 +170,7 @@ def job_wrapper(target: str) -> None:
         global_update_job()
         return
 
+    sloc = LOG_LOCALE
     db = SessionLocal()
     try:
         logger.info("Ejecutando tarea programada: %s", target)
@@ -169,9 +181,13 @@ def job_wrapper(target: str) -> None:
                 target,
             )
             return
-        success, logs = update_single_project_logic(target, db)
+        success, logs = update_single_project_logic(target, db, locale=sloc)
 
-        summary = f"[Scheduled] {target}: {'OK' if success else 'ERROR'}"
+        summary = (
+            t("scheduler.scheduled_ok", sloc, target=target)
+            if success
+            else t("scheduler.scheduled_error", sloc, target=target)
+        )
         persist_update_log(
             db,
             status="SUCCESS" if success else "ERROR",
@@ -184,7 +200,7 @@ def job_wrapper(target: str) -> None:
             persist_update_log(
                 db,
                 status="ERROR",
-                summary=f"[Scheduled] {target}: EXCEPCION",
+                summary=t("scheduler.scheduled_exception", sloc, target=target),
                 details={target: [str(exc)]},
             )
         except Exception as log_exc:

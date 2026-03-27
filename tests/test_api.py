@@ -123,6 +123,54 @@ def test_trigger_update_all(client: TestClient) -> None:
     assert "message" in data
 
 
+def test_trigger_update_all_message_english(client: TestClient) -> None:
+    response = client.post(
+        "/api/update-all",
+        headers={"Accept-Language": "en"},
+    )
+    assert response.status_code == 200
+    assert "background" in response.json()["message"].lower()
+
+
+def test_update_passes_locale_to_logic(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, str] = {}
+
+    def _fake(name, db, *, locale="es"):
+        seen["locale"] = locale
+        return True, []
+
+    monkeypatch.setattr(
+        projects_module, "update_single_project_logic", _fake
+    )
+
+    r = client.post(
+        "/api/projects/any/update",
+        headers={"Accept-Language": "en"},
+    )
+    assert r.status_code == 200
+    assert seen.get("locale") == "en"
+
+
+def test_update_failed_detail_english(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        projects_module,
+        "update_single_project_logic",
+        lambda _n, _db, **kw: (False, []),
+    )
+
+    r = client.post(
+        "/api/projects/x/update",
+        headers={"Accept-Language": "en"},
+    )
+    assert r.status_code == 500
+    detail = r.json().get("detail", "")
+    assert "history" in detail.lower() or "ui" in detail.lower()
+
+
 def test_create_schedule_rejects_unschedulable_date(client: TestClient) -> None:
     response = client.post(
         "/api/schedules",
@@ -217,10 +265,13 @@ def test_update_rejects_project_path_outside_projects_root(
     finally:
         db.close()
 
-    response = client.post("/api/projects/myapp/update")
+    response = client.post(
+        "/api/projects/myapp/update",
+        headers={"Accept-Language": "es"},
+    )
     assert response.status_code == 500
     detail = response.json().get("detail", "")
-    assert "La actualización falló" in detail
+    assert "historial" in detail.lower()
     assert "PROJECTS_ROOT" not in detail
 
 
