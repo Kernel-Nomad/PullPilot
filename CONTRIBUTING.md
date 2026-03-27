@@ -96,7 +96,7 @@ The default `IMAGE_NAME` targets the GHCR-published image; override if needed: `
 
 ## Image publishing (maintainers)
 
-The `.github/workflows/ghcr-publish.yml` workflow builds and pushes the image to **GitHub Container Registry** when a **release** (not a prerelease) is published on GitHub.
+The `.github/workflows/ghcr-publish.yml` workflow builds and pushes the image to **GitHub Container Registry** when a **release** (not a prerelease) is published on GitHub. It also uploads `docker-compose.yml` and `env.example` to the release. The latter is a copy of `.env.example` under a name without a leading dot so the asset is not renamed by GitHub / `gh` (which would otherwise produce names like `default.env.example`).
 
 ---
 

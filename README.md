@@ -44,22 +44,21 @@
 <a name="english"></a>
 # PullPilot
 
-App to manage updates for your Docker images and services (status, logs, deployment modes) from a single UI.
+PullPilot is an app aimed at homelab and personal deployments. It lets you manage updates for your Docker images and services (status, logs, deployment modes) from a single UI.
 
-**Recommended:** download the official [`docker-compose.yml`](./docker-compose.yml) on your server **without cloning**. Image: `ghcr.io/kernel-nomad/pullpilot:latest` (stable [releases](https://github.com/Kernel-Nomad/PullPilot/releases) also publish semver tags; pin `image:` and run `docker compose pull && docker compose up -d` to upgrade). Release assets include the same compose and [`.env.example`](./.env.example). Replace `main` in the URL below if you use another branch.
-
-## 1-minute start
+## Quick install
 
 ```bash
 sudo mkdir -p /srv/docker-stacks
 mkdir -p ~/pullpilot && cd ~/pullpilot
 curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
 docker compose up -d
 ```
 
 Open **http://your-server-ip:8000** (or the host port from `PULLPILOT_PORT` in `.env`).
 
-No `.env` is required if you use the default stacks path **`/srv/docker-stacks`**. The official `docker-compose.yml` sets **`ALLOW_NO_AUTH=true`** by default so the quick start works without login on a trusted LAN. For anything reachable beyond that, set **`ALLOW_NO_AUTH=false`**, define **`AUTH_USER`** and **`AUTH_PASS`**, and a fixed **`SESSION_SECRET`** (see [Environment variables (reference)](#environment-variables-reference)). Local `make dev-server` also sets `ALLOW_NO_AUTH=true` for convenience.
+No `.env` is required if you use the default stacks path **`/srv/docker-stacks`**; use **`.env.example`** as reference and copy it to **`.env`** when you need overrides. The official `docker-compose.yml` sets **`ALLOW_NO_AUTH=true`** by default so the quick start works without login on a trusted LAN. For anything reachable beyond that, set **`ALLOW_NO_AUTH=false`**, define **`AUTH_USER`** and **`AUTH_PASS`**, and a fixed **`SESSION_SECRET`** (see [Environment variables (reference)](#environment-variables-reference)). Local `make dev-server` also sets `ALLOW_NO_AUTH=true` for convenience.
 
 ## After startup
 
@@ -113,7 +112,7 @@ Single list for Compose `.env` and runtime. Details also in [`.env.example`](./.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCKER_ROOT_PATH` | `/srv/docker-stacks` | Same absolute stacks path on host and container (bind mount). / Misma ruta absoluta en host y contenedor. |
+| `DOCKER_ROOT_PATH` | `/srv/docker-stacks` | Same absolute stacks path on host and container (bind mount). |
 | `PROJECTS_ROOT` | (from `DOCKER_ROOT_PATH`) | Advanced: different path *inside* the container only. |
 | `PULLPILOT_PORT` | `8000` | Published host port for the UI. |
 | `TZ` | `UTC` | Container timezone. |
@@ -155,27 +154,26 @@ SESSION_HTTPS_ONLY=true
 <a name="español"></a>
 # PullPilot
 
-App para gestionar actualizaciones de imágenes y servicios Docker (estado, logs, modos de despliegue) desde una sola interfaz.
+PullPilot es una aplicación pensada para desplegarse en homelabs y para uso personal. Permite gestionar actualizaciones de imágenes y servicios Docker (estado, logs, modos de despliegue) desde una sola interfaz.
 
-**Recomendado:** descargar el [`docker-compose.yml`](./docker-compose.yml) oficial en el servidor **sin clonar**. Imagen: `ghcr.io/kernel-nomad/pullpilot:latest` ([releases](https://github.com/Kernel-Nomad/PullPilot/releases) con tags semver; fija `image:` y usa `docker compose pull && docker compose up -d` para actualizar). Los assets del release incluyen el mismo compose y [`.env.example`](./.env.example). Cambia `main` en la URL si usas otra rama.
-
-## Inicio en 1 minuto
+## Instalación rápida
 
 ```bash
 sudo mkdir -p /srv/docker-stacks
 mkdir -p ~/pullpilot && cd ~/pullpilot
 curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
 docker compose up -d
 ```
 
 Abre **http://tu-servidor-ip:8000** (o el puerto del host definido en `PULLPILOT_PORT` en `.env`).
 
-No hace falta `.env` si usas la ruta por defecto **`/srv/docker-stacks`**. El `docker-compose.yml` oficial define **`ALLOW_NO_AUTH=true`** por defecto para el inicio rápido sin login en una LAN de confianza. Si la instancia es accesible más allá de eso, pon **`ALLOW_NO_AUTH=false`**, **`AUTH_USER`**, **`AUTH_PASS`** y un **`SESSION_SECRET`** fijo (tabla en [Environment variables (reference)](#environment-variables-reference)). `make dev-server` también usa `ALLOW_NO_AUTH=true` por comodidad.
+No hace falta `.env` si usas la ruta por defecto de stacks **`/srv/docker-stacks`**; usa **`.env.example`** como referencia y cópialo a **`.env`** cuando necesites personalizar. El `docker-compose.yml` oficial define **`ALLOW_NO_AUTH=true`** por defecto para que el inicio rápido funcione sin login en una LAN de confianza. Si la instancia es accesible más allá de eso, pon **`ALLOW_NO_AUTH=false`**, define **`AUTH_USER`** y **`AUTH_PASS`**, y un **`SESSION_SECRET`** fijo (véase [Variables de entorno (referencia)](#variables-de-entorno-referencia)). En local, `make dev-server` también define `ALLOW_NO_AUTH=true` por comodidad.
 
 ## Después del arranque
 
-- **Otra ruta de stacks:** crea la carpeta en el host y añade `.env` junto al compose con **`DOCKER_ROOT_PATH=/ruta/absoluta/stacks`** (misma ruta en host y contenedor). Tras cambiar `.env`, ejecuta `docker compose up -d` o `docker compose restart`.
-- **Estructura:** cada proyecto es una **subcarpeta** con `docker-compose.yml` o `docker-compose.yaml`. Conviene tener la carpeta de PullPilot **fuera** de ese árbol.
+- **Otra ubicación de stacks:** crea la carpeta en el host y añade `.env` junto a `docker-compose.yml` con **`DOCKER_ROOT_PATH=/ruta/absoluta/a/stacks`** (misma ruta en host y contenedor). Tras cualquier cambio en `.env`, ejecuta `docker compose up -d` o `docker compose restart`.
+- **Estructura:** cada proyecto es una **subcarpeta** bajo esa raíz con `docker-compose.yml` o `docker-compose.yaml` dentro. Cuando puedas, mantén la carpeta de compose de PullPilot **fuera** de ese árbol.
 
 ```
 /srv/docker-stacks/          # DOCKER_ROOT_PATH por defecto
@@ -184,15 +182,15 @@ No hace falta `.env` si usas la ruta por defecto **`/srv/docker-stacks`**. El `d
 └── ...
 ```
 
-> Se ignoran las carpetas `pullpilot`, `pullpilot-ui`, `docker-updater` y `data` bajo la raíz de stacks.
+> Las carpetas llamadas `pullpilot`, `pullpilot-ui`, `docker-updater` y `data` se ignoran bajo la raíz de stacks.
 
-**Repo clonado (desarrollo):** usa el [`docker-compose.yml`](./docker-compose.yml) del árbol; los overrides están en [`.env.example`](./.env.example).
+**Repositorio clonado (desarrollo):** usa el [`docker-compose.yml`](./docker-compose.yml) del árbol; los overrides están documentados en [`.env.example`](./.env.example).
 
 ## Guía de uso
 
-- **Dashboard:** tarjetas por proyecto; estado, actualización individual, interruptores **Full stop** y **Excluir**.
-- **Actualizar todo:** escanea proyectos no excluidos, `git pull` si aplica, recrea contenedores; resumen en **Historial**.
-- **Programación:** por defecto, actualización global diaria a las 04:00 (hora del contenedor).
+- **Dashboard:** tarjetas por proyecto; estado, actualización por proyecto, interruptores **Full stop** y **Excluir**.
+- **Actualizar todo:** escanea proyectos no excluidos, `git pull` cuando aplique, recrea contenedores; resumen en **Historial**.
+- **Programación:** actualización global diaria por defecto a las 04:00 (hora del contenedor).
 
 ## Desarrollo local (contribuidores)
 
@@ -202,17 +200,61 @@ cd PullPilot
 docker compose -f docker-compose-build.yml up -d --build
 ```
 
-Día a día: `make dev-server`, `make dev-web` (ver [`Makefile`](./Makefile)).
+Día a día: `make dev-server`, `make dev-web` (véase [`Makefile`](./Makefile)).
 
 ## Notas importantes
 
-- **Socket Docker:** trata PullPilot como acceso privilegiado; no expongas el puerto 8000 a internet pública sin TLS (proxy inverso), **`ALLOW_NO_AUTH=false`**, **`AUTH_USER` / `AUTH_PASS`** fuertes y, si puedes, otra capa de auth (Authelia, Authentik, etc.).
-- **Rutas de stacks:** las actualizaciones y tareas programadas solo usan directorios bajo **`PROJECTS_ROOT`** (resuelto); rutas en BD fuera de ese árbol se rechazan.
-- **Un solo worker:** un proceso Uvicorn por instancia (scheduler y rate limit en memoria). Si usas **`UVICORN_WORKERS` > 1**, debes definir **`SESSION_SECRET`** para que todas las firmas de sesión coincidan.
-- **Autenticación:** con **`ALLOW_NO_AUTH=false`** (valor por defecto fuera del compose oficial), la app **no arranca** sin **`AUTH_USER`** y **`AUTH_PASS`**. Con **`ALLOW_NO_AUTH=true`**, la API queda abierta salvo que también definas credenciales (entonces el middleware exige sesión).
-- **SESSION_SECRET:** sin definir, cada reinicio invalida sesiones; en producción usa un valor aleatorio largo (`openssl rand -hex 32`).
-- **HTTPS / cookies:** tras un proxy con TLS, **`SESSION_HTTPS_ONLY=true`**. **`SESSION_SAME_SITE`** por defecto `lax`; `strict` endurece same-site; `none` solo con HTTPS y necesidad cross-site (el navegador exige `Secure`).
-- **PROJECTS_ROOT:** solo si la ruta *dentro* del contenedor debe diferir del bind mount; si no, usa `DOCKER_ROOT_PATH`.
-- **Proxy:** `TRUST_X_FORWARDED_FOR=true` solo detrás de un proxy de confianza (afecta la IP del rate limit de login).
+- **Socket de Docker:** trata PullPilot como acceso de nivel root; no expongas el puerto 8000 a internet pública sin TLS (proxy inverso), **`ALLOW_NO_AUTH=false`**, **`AUTH_USER` / `AUTH_PASS`** robustos y, si es posible, otra capa de autenticación (Authelia, Authentik, etc.).
+- **Rutas de stacks:** las actualizaciones y tareas programadas solo se ejecutan bajo **`PROJECTS_ROOT`** (resuelto); las rutas en base de datos fuera de ese árbol se rechazan.
+- **Un solo worker:** un worker de Uvicorn por instancia (scheduler y límite de intentos de login en memoria). Si alguna vez usas **`UVICORN_WORKERS` > 1**, **debes** definir **`SESSION_SECRET`** para que todos los workers compartan la misma clave de firma.
+- **Autenticación:** con **`ALLOW_NO_AUTH=false`** (valor por defecto cuando no se usan los valores del compose oficial), la aplicación **no arranca** hasta que estén definidos **tanto** `AUTH_USER` como `AUTH_PASS`. Con **`ALLOW_NO_AUTH=true`**, la API queda abierta salvo que también definas credenciales (en ese caso el middleware exige login cuando ambas están definidas).
+- **SESSION_SECRET:** sin definir ⇒ un secreto nuevo en cada reinicio ⇒ las sesiones se reinician; en producción define un valor aleatorio largo (`openssl rand -hex 32`).
+- **HTTPS / cookies:** detrás de un proxy que termina TLS, define **`SESSION_HTTPS_ONLY=true`**. **`SESSION_SAME_SITE`** por defecto es `lax` (Starlette); usa `strict` para un comportamiento same-site más estricto, o `none` solo con HTTPS y requisitos cross-site (los navegadores exigen `Secure`).
+- **PROJECTS_ROOT:** úsalo solo si la ruta *dentro* del contenedor debe diferir del bind mount; en caso contrario usa `DOCKER_ROOT_PATH`.
+- **Proxy:** `TRUST_X_FORWARDED_FOR=true` solo detrás de un proxy en el que confíes (afecta la IP usada en el rate limit de login).
 
-Variables y bloque avanzado: [Environment variables (reference)](#environment-variables-reference) (tabla bilingüe compacta).
+---
+
+<a name="variables-de-entorno-referencia"></a>
+## Variables de entorno (referencia)
+
+Lista única para `.env` de Compose y tiempo de ejecución. Más detalle en [`.env.example`](./.env.example).
+
+| Variable | Valor por defecto | Descripción |
+|----------|-------------------|-------------|
+| `DOCKER_ROOT_PATH` | `/srv/docker-stacks` | Misma ruta absoluta de stacks en host y contenedor (bind mount). |
+| `PROJECTS_ROOT` | (desde `DOCKER_ROOT_PATH`) | Avanzado: ruta distinta *solo* dentro del contenedor. |
+| `PULLPILOT_PORT` | `8000` | Puerto publicado en el host para la interfaz. |
+| `TZ` | `UTC` | Zona horaria del contenedor. |
+| `DATA_DIR` | `/app/data` | SQLite y datos en tiempo de ejecución (el compose oficial usa el volumen `pullpilot_data`). |
+| `ALLOW_NO_AUTH` | `false`* | *El compose oficial usa `true` por sustitución. Si es `false`, **`AUTH_USER`** y **`AUTH_PASS`** son obligatorios o el arranque falla. |
+| `AUTH_USER` / `AUTH_PASS` | (sin definir) | Obligatorios cuando `ALLOW_NO_AUTH=false`. Si ambos están definidos, el middleware exige sesión. |
+| `SESSION_SECRET` | (generado) | Valor fijo ⇒ las sesiones sobreviven a reinicios. **Obligatorio** si `UVICORN_WORKERS` > 1. |
+| `SESSION_HTTPS_ONLY` | `false` | Pon `true` si la app solo se sirve por HTTPS. |
+| `SESSION_SAME_SITE` | `lax` | SameSite de la cookie: `lax`, `strict` o `none` (usa `none` solo con HTTPS). |
+| `CORS_ORIGINS` | (vacío) | Orígenes separados por comas; vacío suele bastar cuando el SPA lo sirve la misma app. |
+| `HEALTHCHECK_TIMEOUT` | `60` | Espera de salud tras despliegue (segundos). |
+| `COMMAND_TIMEOUT` | `300` | Tiempo máximo de comandos externos (segundos). |
+| `LOG_LOCALE` | `es` | Idioma de logs de actualizaciones programadas e historial (`es` o `en`). Las actualizaciones desde la UI usan `Accept-Language`. |
+| `LOGIN_RATE_LIMIT_ENABLED` | `true` | Límite de intentos de login en memoria por IP. |
+| `LOGIN_RATE_LIMIT_MAX` | `15` | Máximo de intentos por ventana. |
+| `LOGIN_RATE_LIMIT_WINDOW_SEC` | `300` | Duración de la ventana (segundos). |
+| `TRUST_X_FORWARDED_FOR` | `false` | Usar `X-Forwarded-For` para el rate limit (solo proxy de confianza). |
+
+### Avanzado (copia en `.env` según necesites)
+
+```bash
+# Estilo producción (ejemplo)
+# ALLOW_NO_AUTH=false
+# AUTH_USER=admin
+# AUTH_PASS=tu-contraseña-segura
+SESSION_HTTPS_ONLY=true
+# SESSION_SAME_SITE=strict
+# CORS_ORIGINS=https://pullpilot.example.com
+# LOGIN_RATE_LIMIT_ENABLED=true
+# LOGIN_RATE_LIMIT_MAX=15
+# LOGIN_RATE_LIMIT_WINDOW_SEC=300
+# HEALTHCHECK_TIMEOUT=60
+# COMMAND_TIMEOUT=300
+# TRUST_X_FORWARDED_FOR=true
+```

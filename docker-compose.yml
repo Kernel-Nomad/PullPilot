@@ -1,14 +1,3 @@
-# PullPilot — https://github.com/Kernel-Nomad/PullPilot
-#
-# 1-minute start (matches README):
-#   sudo mkdir -p /srv/docker-stacks
-#   mkdir -p ~/pullpilot && cd ~/pullpilot
-#   curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
-#   docker compose up -d
-#
-# Optional .env next to this file: DOCKER_ROOT_PATH, PULLPILOT_PORT, TZ, AUTH_*, etc.
-# Compose loads .env for variable substitution when the file exists.
-#
 services:
   pullpilot:
     container_name: pullpilot

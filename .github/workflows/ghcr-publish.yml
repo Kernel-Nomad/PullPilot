@@ -58,7 +58,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cp .env.example env.example
           gh release upload "${{ github.event.release.tag_name }}" \
             docker-compose.yml \
-            .env.example \
+            env.example \
             --clobber
