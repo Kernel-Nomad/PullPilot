@@ -38,6 +38,9 @@ RUN pip install --no-cache-dir .
 
 COPY --from=frontend-builder /app-web/dist ./server/static
 
+# pip install puts `server` in site-packages; dist lives under /app/server/static.
+ENV STATIC_DIR=/app/server/static
+
 RUN mkdir -p /app/data
 
 EXPOSE 8000

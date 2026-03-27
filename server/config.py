@@ -20,7 +20,8 @@ PROJECTS_ROOT = Path(
     os.getenv("PROJECTS_ROOT") or os.getenv("DOCKER_ROOT_PATH", DEFAULT_STACKS_ROOT)
 )
 DB_PATH = DATA_DIR / "pullpilot.db"
-STATIC_DIR = BASE_DIR / "static"
+_static_override = os.getenv("STATIC_DIR", "").strip()
+STATIC_DIR = Path(_static_override) if _static_override else BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
 HEALTHCHECK_TIMEOUT = int(os.getenv("HEALTHCHECK_TIMEOUT", "60"))

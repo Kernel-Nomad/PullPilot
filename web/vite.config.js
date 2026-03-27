@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["logo.svg"],
+      includeAssets: ["assets/logo.png"],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         navigateFallbackDenylist: [/^\/login/, /^\/logout/],
@@ -22,9 +22,9 @@ export default defineConfig({
         orientation: "portrait",
         icons: [
           {
-            src: "logo.svg",
-            sizes: "any",
-            type: "image/svg+xml",
+            src: "assets/logo.png",
+            sizes: "512x512",
+            type: "image/png",
           },
         ],
       },
