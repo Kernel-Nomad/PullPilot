@@ -9,19 +9,19 @@
 </h3>
 
 <p align="center">
-  <a href="https://github.com/Kernel-Nomad/PullPilot/stargazers">
-    <img src="https://img.shields.io/github/stars/Kernel-Nomad/PullPilot?style=social" alt="GitHub stars"/>
+  <a href="https://github.com/KN990x/PullPilot/stargazers">
+    <img src="https://img.shields.io/github/stars/KN990x/PullPilot?style=social" alt="GitHub stars"/>
   </a>
   &nbsp;
-  <a href="https://github.com/Kernel-Nomad/PullPilot/issues">
-    <img src="https://img.shields.io/github/issues/Kernel-Nomad/PullPilot" alt="GitHub issues"/>
+  <a href="https://github.com/KN990x/PullPilot/issues">
+    <img src="https://img.shields.io/github/issues/KN990x/PullPilot" alt="GitHub issues"/>
   </a>
   &nbsp;
   <a href="./LICENSE">
-    <img src="https://img.shields.io/github/license/Kernel-Nomad/PullPilot" alt="License"/>
+    <img src="https://img.shields.io/github/license/KN990x/PullPilot" alt="License"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/github/last-commit/Kernel-Nomad/PullPilot" alt="Last commit"/>
+  <img src="https://img.shields.io/github/last-commit/KN990x/PullPilot" alt="Last commit"/>
 </p>
 
 <p align="center">
@@ -51,8 +51,8 @@ PullPilot is an app aimed at homelab and personal deployments. It lets you manag
 ```bash
 sudo mkdir -p /srv/docker-stacks
 mkdir -p ~/pullpilot && cd ~/pullpilot
-curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
-curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/KN990x/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/KN990x/PullPilot/main/.env.example
 docker compose up -d
 ```
 
@@ -85,7 +85,7 @@ No `.env` is required if you use the default stacks path **`/srv/docker-stacks`*
 ## Local development (contributors)
 
 ```bash
-git clone https://github.com/Kernel-Nomad/PullPilot
+git clone https://github.com/KN990x/PullPilot
 cd PullPilot
 docker compose -f docker-compose-build.yml up -d --build
 ```
@@ -94,6 +94,7 @@ Day-to-day: `make dev-server`, `make dev-web` (see [`Makefile`](./Makefile)).
 
 ## Important notes
 
+- **GHCR image:** the published image is `ghcr.io/kn990x/pullpilot`. If you still pin `ghcr.io/kernel-nomad/pullpilot`, update your compose file or `docker pull` to the new path.
 - **Docker socket:** treat PullPilot like root access; do not expose port 8000 to the public internet without TLS (reverse proxy), **`ALLOW_NO_AUTH=false`**, strong **`AUTH_USER` / `AUTH_PASS`**, and ideally an extra auth layer (Authelia, Authentik, etc.).
 - **Stack paths:** updates and scheduled jobs only run under **`PROJECTS_ROOT`** (resolved); database paths outside that tree are rejected.
 - **Single worker:** one Uvicorn worker per instance (scheduler and login rate limit are in-memory). If you ever run **`UVICORN_WORKERS` > 1**, you **must** set **`SESSION_SECRET`** so all workers share the same signing key.
@@ -161,8 +162,8 @@ PullPilot es una aplicación pensada para desplegarse en homelabs y para uso per
 ```bash
 sudo mkdir -p /srv/docker-stacks
 mkdir -p ~/pullpilot && cd ~/pullpilot
-curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/docker-compose.yml
-curl -fsSL -o .env.example https://raw.githubusercontent.com/Kernel-Nomad/PullPilot/main/.env.example
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/KN990x/PullPilot/main/docker-compose.yml
+curl -fsSL -o .env.example https://raw.githubusercontent.com/KN990x/PullPilot/main/.env.example
 docker compose up -d
 ```
 
@@ -195,7 +196,7 @@ No hace falta `.env` si usas la ruta por defecto de stacks **`/srv/docker-stacks
 ## Desarrollo local (contribuidores)
 
 ```bash
-git clone https://github.com/Kernel-Nomad/PullPilot
+git clone https://github.com/KN990x/PullPilot
 cd PullPilot
 docker compose -f docker-compose-build.yml up -d --build
 ```
@@ -204,6 +205,7 @@ Día a día: `make dev-server`, `make dev-web` (véase [`Makefile`](./Makefile))
 
 ## Notas importantes
 
+- **Imagen GHCR:** la imagen publicada es `ghcr.io/kn990x/pullpilot`. Si sigues usando `ghcr.io/kernel-nomad/pullpilot`, actualiza el compose o `docker pull` a la nueva ruta.
 - **Socket de Docker:** trata PullPilot como acceso de nivel root; no expongas el puerto 8000 a internet pública sin TLS (proxy inverso), **`ALLOW_NO_AUTH=false`**, **`AUTH_USER` / `AUTH_PASS`** robustos y, si es posible, otra capa de autenticación (Authelia, Authentik, etc.).
 - **Rutas de stacks:** las actualizaciones y tareas programadas solo se ejecutan bajo **`PROJECTS_ROOT`** (resuelto); las rutas en base de datos fuera de ese árbol se rechazan.
 - **Un solo worker:** un worker de Uvicorn por instancia (scheduler y límite de intentos de login en memoria). Si alguna vez usas **`UVICORN_WORKERS` > 1**, **debes** definir **`SESSION_SECRET`** para que todos los workers compartan la misma clave de firma.

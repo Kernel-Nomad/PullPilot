@@ -1,5 +1,5 @@
 SHELL := /bin/sh
-IMAGE_NAME ?= ghcr.io/kernel-nomad/pullpilot
+IMAGE_NAME ?= ghcr.io/kn990x/pullpilot
 # Intérprete Python para test/lint (3.11+). Con venv activado suele bastar `python`; si `python3` del sistema es antiguo: PY=python3.11 make test
 PY ?= python
 

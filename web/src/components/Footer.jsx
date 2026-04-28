@@ -9,7 +9,7 @@ export default function Footer({ t }) {
         </div>
         <div className="flex flex-row flex-wrap justify-center items-center gap-4 md:gap-6 order-1 md:order-2">
           <a
-            href="https://ko-fi.com/F2F81PNZRL"
+            href="https://ko-fi.com/kn990x"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-1 rounded-full text-white text-sm font-bold transition-all hover:opacity-90 hover:scale-105 active:scale-95 shadow-sm h-[28px] whitespace-nowrap"
