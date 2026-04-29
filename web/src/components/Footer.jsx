@@ -4,7 +4,7 @@ export default function Footer({ t }) {
       <div className="max-w-7xl mx-auto px-6 py-6 md:py-8 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="text-slate-400 text-sm font-medium text-center md:text-left order-2 md:order-1">
           <p>
-            &copy; {new Date().getFullYear()} <span className="text-slate-600 font-semibold">KN</span>
+            &copy; {new Date().getFullYear()} <span className="text-slate-600 font-semibold">KN990x</span>
           </p>
         </div>
         <div className="flex flex-row flex-wrap justify-center items-center gap-4 md:gap-6 order-1 md:order-2">
